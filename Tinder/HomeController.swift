@@ -14,6 +14,12 @@ class HomeController: UIViewController {
     let cardsDeckView   = UIView()
     let bottomStackView = HomeBottomControlsStackView()
     
+    let users = [
+        
+        User(name: "Kelly", age: 23, profession: "Music DJ", imageName: "lady5c"),
+        User(name: "Jane", age: 20, profession: "Teacher", imageName: "lady4c")
+    ]
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupLayout()
@@ -37,9 +43,22 @@ class HomeController: UIViewController {
     
     fileprivate func setupDummyCards() {
         
-        let cardView = CardView(frame: .zero)
-        cardsDeckView.addSubview(cardView)
-        cardView.fillSuperview()
+        users.forEach { (user) in
+            
+            let cardView = CardView(frame: .zero)
+            cardView.imageView.image = UIImage(named: user.imageName)
+            cardsDeckView.addSubview(cardView)
+        
+            let attributedText = NSMutableAttributedString(string: user.name, attributes: [.font: UIFont.systemFont(ofSize: 32, weight: .heavy)])
+            
+            attributedText.append(NSAttributedString(string: " \(user.age)", attributes: [.font: UIFont.systemFont(ofSize: 24, weight: .regular)]))
+            
+            attributedText.append(NSAttributedString(string: "\n\(user.profession)", attributes: [.font: UIFont.systemFont(ofSize: 20, weight: .regular)]))
+            
+            cardView.informationLabel.attributedText = attributedText
+            
+            cardView.fillSuperview()
+        }
     }
 }
 
