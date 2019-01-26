@@ -21,6 +21,7 @@ class CardView: UIView {
     
     fileprivate let imageView = UIImageView(image: #imageLiteral(resourceName: "lady5c"))
     fileprivate let informationLabel = UILabel()
+    let gradientLayer = CAGradientLayer()
     
     
     // Configuration
@@ -29,27 +30,50 @@ class CardView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         
+        setupLayout()
+        
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(gesture:)))
+        addGestureRecognizer(panGesture)
+    }
+    
+    fileprivate func setupLayout() {
         layer.cornerRadius = 10
         clipsToBounds = true
         addSubview(imageView)
         imageView.contentMode = .scaleAspectFill
         imageView.fillSuperview()
         
+        // Add gradian layer
+        setupGradianLayer()
+        
         addSubview(informationLabel)
         informationLabel.textColor = .white
-        informationLabel.font = UIFont.systemFont(ofSize: 34, weight: .heavy)
-        informationLabel.text = "TESRT NAME TEST NAME AGE PROFESSION"
         informationLabel.numberOfLines = 0
         
         informationLabel.anchor(top: nil, leading: leadingAnchor, bottom: bottomAnchor, trailing: trailingAnchor, padding: .init(top: 0, left: 16, bottom: -16, right: 16))
+    }
+    
+    fileprivate func setupGradianLayer() {
         
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(gesture:)))
-        addGestureRecognizer(panGesture)
+        gradientLayer.colors = [UIColor.clear.cgColor, UIColor.black.cgColor]
+        gradientLayer.locations = [0.5, 1.1]
+        
+        layer.addSublayer(gradientLayer)
+    }
+    
+    override func layoutSubviews() {
+        
+        gradientLayer.frame = self.frame
+        
     }
 
     @objc fileprivate func handlePan(gesture: UIPanGestureRecognizer) {
         
         switch gesture.state {
+        case .began:
+            superview?.subviews.forEach({ (subview) in
+                subview.layer.removeAllAnimations()
+            })
         case .changed:
             handleChanged(gesture)
         case .ended:
