@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C34D499521FBFF63008E8010 /* Extensions+UIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34D499421FBFF63008E8010 /* Extensions+UIView.swift */; };
 		C379FC6A21F8A27200DD05C3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C379FC6921F8A27200DD05C3 /* AppDelegate.swift */; };
 		C379FC6C21F8A27200DD05C3 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C379FC6B21F8A27200DD05C3 /* ViewController.swift */; };
 		C379FC6F21F8A27200DD05C3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C379FC6D21F8A27200DD05C3 /* Main.storyboard */; };
@@ -15,6 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C34D499421FBFF63008E8010 /* Extensions+UIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions+UIView.swift"; sourceTree = "<group>"; };
 		C379FC6621F8A27200DD05C3 /* Tinder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tinder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C379FC6921F8A27200DD05C3 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		C379FC6B21F8A27200DD05C3 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -35,6 +37,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C34D499321FBFEA1008E8010 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				C34D499421FBFF63008E8010 /* Extensions+UIView.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
 		C379FC5D21F8A27200DD05C3 = {
 			isa = PBXGroup;
 			children = (
@@ -54,6 +64,7 @@
 		C379FC6821F8A27200DD05C3 /* Tinder */ = {
 			isa = PBXGroup;
 			children = (
+				C34D499321FBFEA1008E8010 /* Extensions */,
 				C379FC6921F8A27200DD05C3 /* AppDelegate.swift */,
 				C379FC6B21F8A27200DD05C3 /* ViewController.swift */,
 				C379FC6D21F8A27200DD05C3 /* Main.storyboard */,
@@ -137,6 +148,7 @@
 			files = (
 				C379FC6C21F8A27200DD05C3 /* ViewController.swift in Sources */,
 				C379FC6A21F8A27200DD05C3 /* AppDelegate.swift in Sources */,
+				C34D499521FBFF63008E8010 /* Extensions+UIView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -283,13 +295,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = ZTF5MT65DL;
+				DEVELOPMENT_TEAM = Y77A582JHV;
 				INFOPLIST_FILE = Tinder/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.bekzodrakhmatov.telegramClone.Tinder;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bekzodrakhmatov.Tinder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 4.2;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -301,13 +313,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = ZTF5MT65DL;
+				DEVELOPMENT_TEAM = Y77A582JHV;
 				INFOPLIST_FILE = Tinder/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.bekzodrakhmatov.telegramClone.Tinder;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bekzodrakhmatov.Tinder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 4.2;
 				TARGETED_DEVICE_FAMILY = "1,2";
