@@ -11,24 +11,35 @@ import UIKit
 class HomeController: UIViewController {
 
     let topStackView    = TopNavigationStackView()
-    let blueView        = UIView()
+    let cardsDeckView   = UIView()
     let bottomStackView = HomeBottomControlsStackView()
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        blueView.backgroundColor = .blue
-        
         setupLayout()
+        setupDummyCards()
     }
     
-    //MARK: - FILEPRIVATE
+    //MARK: - Setup File Private Methods
+    
     fileprivate func setupLayout() {
-        let overallStackView = UIStackView(arrangedSubviews: [topStackView, blueView, bottomStackView])
+        let overallStackView = UIStackView(arrangedSubviews: [topStackView, cardsDeckView, bottomStackView])
         overallStackView.axis = .vertical
         view.addSubview(overallStackView)
         
         overallStackView.anchor(top: view.safeAreaLayoutGuide.topAnchor, leading: view.leadingAnchor, bottom: view.safeAreaLayoutGuide.bottomAnchor, trailing: view.trailingAnchor)
+        
+        overallStackView.isLayoutMarginsRelativeArrangement = true
+        overallStackView.layoutMargins = .init(top: 0, left: 12, bottom: 0, right: 12)
+        
+        overallStackView.bringSubviewToFront(cardsDeckView)
+    }
+    
+    fileprivate func setupDummyCards() {
+        
+        let cardView = CardView(frame: .zero)
+        cardsDeckView.addSubview(cardView)
+        cardView.fillSuperview()
     }
 }
 
