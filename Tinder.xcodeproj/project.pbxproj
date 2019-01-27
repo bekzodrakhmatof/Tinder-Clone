@@ -21,6 +21,7 @@
 		C379FC7421F8A27200DD05C3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C379FC7221F8A27200DD05C3 /* LaunchScreen.storyboard */; };
 		C396853B21FD745800E67F65 /* RegistrationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853A21FD745800E67F65 /* RegistrationController.swift */; };
 		C396853D21FD7A6C00E67F65 /* CustomTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853C21FD7A6C00E67F65 /* CustomTextField.swift */; };
+		C396853F21FDA67400E67F65 /* RegistrationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		C379FC7521F8A27200DD05C3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C396853A21FD745800E67F65 /* RegistrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationController.swift; sourceTree = "<group>"; };
 		C396853C21FD7A6C00E67F65 /* CustomTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomTextField.swift; sourceTree = "<group>"; };
+		C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,6 +88,7 @@
 			children = (
 				C379FC6B21F8A27200DD05C3 /* HomeController.swift */,
 				C396853A21FD745800E67F65 /* RegistrationController.swift */,
+				C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */,
 			);
 			path = Controllers;
 			sourceTree = "<group>";
@@ -203,6 +206,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C379FC6C21F8A27200DD05C3 /* HomeController.swift in Sources */,
+				C396853F21FDA67400E67F65 /* RegistrationViewModel.swift in Sources */,
 				C396853D21FD7A6C00E67F65 /* CustomTextField.swift in Sources */,
 				C34D499821FC120B008E8010 /* HomeBottomControlsStackView.swift in Sources */,
 				C34D49A521FC51BD008E8010 /* Advertiser.swift in Sources */,

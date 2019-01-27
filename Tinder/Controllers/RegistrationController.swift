@@ -11,7 +11,6 @@ import UIKit
 class RegistrationController: UIViewController {
     
     // UI Components
-
     let selectPhotoButton: UIButton = {
         
         let button = UIButton(type: .system)
@@ -29,6 +28,7 @@ class RegistrationController: UIViewController {
         
         let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter full name"
+        textField.addTarget(self, action: #selector(handleTextChange(_:)), for: .editingChanged)
         
         return textField
     }()
@@ -38,6 +38,7 @@ class RegistrationController: UIViewController {
         let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter email"
         textField.keyboardType = .emailAddress
+        textField.addTarget(self, action: #selector(handleTextChange(_:)), for: .editingChanged)
     
         return textField
     }()
@@ -47,6 +48,8 @@ class RegistrationController: UIViewController {
         let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter password"
         textField.backgroundColor = .white
+        textField.isSecureTextEntry = true
+        textField.addTarget(self, action: #selector(handleTextChange(_:)), for: .editingChanged)
         
         return textField
     }()
@@ -56,11 +59,13 @@ class RegistrationController: UIViewController {
         let button = UIButton(type: .system)
         button.setTitle("Register", for: .normal)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .heavy)
-        button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = #colorLiteral(red: 0.8111879826, green: 0.1042452082, blue: 0.3321437836, alpha: 1)
+        button.setTitleColor(#colorLiteral(red: 0.3459398746, green: 0.340980351, blue: 0.3452142477, alpha: 1), for: .disabled)
+        button.setTitleColor(#colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), for: .normal)
+        button.backgroundColor = #colorLiteral(red: 0.6714041233, green: 0.6664924026, blue: 0.6706650853, alpha: 1)
         button.heightAnchor.constraint(equalToConstant: 44).isActive = true
         button.clipsToBounds = true
         button.layer.cornerRadius = 22
+        button.isEnabled = false
         return button
     }()
 
@@ -70,14 +75,48 @@ class RegistrationController: UIViewController {
         setupNotificationObservers()
         setupGradientLayer()
         setupLayout()
-        
         setupTapGesture()
+        setupRegistrationViewModelObservers()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
         NotificationCenter.default.removeObserver(self)
+    }
+    
+    let registrationViewModel = RegistrationViewModel()
+    
+    fileprivate func setupRegistrationViewModelObservers() {
+        
+        registrationViewModel.isFormValidObserver = { (isFormValid) in
+            
+            self.registerButton.isEnabled = isFormValid
+            if isFormValid {
+                
+                self.registerButton.backgroundColor = #colorLiteral(red: 0.8111879826, green: 0.1042452082, blue: 0.3321437836, alpha: 1)
+                
+            } else {
+                
+                self.registerButton.backgroundColor = #colorLiteral(red: 0.6714041233, green: 0.6664924026, blue: 0.6706650853, alpha: 1)
+            }
+        }
+    }
+    
+    @objc fileprivate func handleTextChange(_ textField: UITextField) {
+        
+        if textField == fullNameTextField {
+            
+            registrationViewModel.fullName = textField.text
+            
+        } else if textField == emailTextField {
+            
+            registrationViewModel.email = textField.text
+            
+        } else {
+            
+            registrationViewModel.password = textField.text
+        }
     }
     
     fileprivate func setupTapGesture() {
@@ -108,12 +147,9 @@ class RegistrationController: UIViewController {
     @objc fileprivate func handleKeyboardShow(_ notification: Notification) {
 
         guard let value = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else { return }
+        
         let keybaordFrame = value.cgRectValue
-        print(keybaordFrame)
-        
         let bottomSpace = view.frame.height - overllStackView.frame.origin.y - overllStackView.frame.height
-        print(bottomSpace)
-        
         let differnce = keybaordFrame.height - bottomSpace
         
         self.view.transform = CGAffineTransform(translationX: 0, y: -differnce - 8)
