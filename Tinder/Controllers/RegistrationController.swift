@@ -23,6 +23,8 @@ class RegistrationController: UIViewController {
         button.heightAnchor.constraint(equalToConstant: 275).isActive = true
         button.layer.cornerRadius = 16
         button.clipsToBounds = true
+        button.addTarget(self, action: #selector(handleSelectPhoto), for: .touchUpInside)
+        button.imageView?.contentMode = .scaleAspectFill
         return button
     }()
     
@@ -88,6 +90,13 @@ class RegistrationController: UIViewController {
         NotificationCenter.default.removeObserver(self)
     }
     
+    @objc fileprivate func handleSelectPhoto() {
+        
+        let imagePickerController = UIImagePickerController()
+        imagePickerController.delegate = self
+        present(imagePickerController, animated: true, completion: nil)
+    }
+    
     @objc fileprivate func handleRegisterButton() {
         
         self.handleTap()
@@ -121,8 +130,8 @@ class RegistrationController: UIViewController {
     
     fileprivate func setupRegistrationViewModelObservers() {
         
-        registrationViewModel.isFormValidObserver = { (isFormValid) in
-            
+        registrationViewModel.bindableIsFormValid.bind { [unowned self] (isFormValid) in
+            guard let isFormValid = isFormValid else  { return }
             self.registerButton.isEnabled = isFormValid
             if isFormValid {
                 
@@ -132,6 +141,11 @@ class RegistrationController: UIViewController {
                 
                 self.registerButton.backgroundColor = #colorLiteral(red: 0.6714041233, green: 0.6664924026, blue: 0.6706650853, alpha: 1)
             }
+        }
+        
+        registrationViewModel.bindableImage.bind { [unowned self] (image) in
+            
+            self.selectPhotoButton.setImage(image?.withRenderingMode(.alwaysOriginal), for: .normal)
         }
     }
     
@@ -191,7 +205,7 @@ class RegistrationController: UIViewController {
     
     fileprivate func setupGradientLayer() {
         
-        let topColor = #colorLiteral(red: 0.9880711436, green: 0.3838337064, blue: 0.3728808165, alpha: 1)
+        let topColor    = #colorLiteral(red: 0.9880711436, green: 0.3838337064, blue: 0.3728808165, alpha: 1)
         let bottomColor = #colorLiteral(red: 0.8920591474, green: 0.1065689698, blue: 0.4587435722, alpha: 1)
         
         gradientLayer.colors = [topColor.cgColor, bottomColor.cgColor]
@@ -249,5 +263,21 @@ class RegistrationController: UIViewController {
         
         overllStackView.anchor(top: nil, leading: view.leadingAnchor, bottom: nil, trailing: view.trailingAnchor, padding: .init(top: 0, left: 50, bottom: 0, right: -50))
         overllStackView.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
+    }
+}
+
+extension RegistrationController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        
+        dismiss(animated: true, completion: nil)
+    }
+    
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        
+        let image = info[.originalImage] as? UIImage
+        registrationViewModel.bindableImage.value = image
+        
+        dismiss(animated: true, completion: nil)
     }
 }
