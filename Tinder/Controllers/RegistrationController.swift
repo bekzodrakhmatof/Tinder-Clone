@@ -11,7 +11,7 @@ import UIKit
 class RegistrationController: UIViewController {
     
     // UI Components
-    
+
     let selectPhotoButton: UIButton = {
         
         let button = UIButton(type: .system)
@@ -27,29 +27,26 @@ class RegistrationController: UIViewController {
     
     let fullNameTextField: CustomTextField = {
         
-        let textField = CustomTextField(padding: 16)
+        let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter full name"
-        textField.backgroundColor = .white
-    
+        
         return textField
     }()
     
     let emailTextField: CustomTextField = {
         
-        let textField = CustomTextField(padding: 24)
+        let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter email"
         textField.keyboardType = .emailAddress
-        textField.backgroundColor = .white
-        
+    
         return textField
     }()
     
     let passwordTextField: CustomTextField = {
         
-        let textField = CustomTextField(padding: 24)
+        let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter password"
         textField.backgroundColor = .white
-        textField.isSecureTextEntry = true
         
         return textField
     }()
@@ -58,19 +55,68 @@ class RegistrationController: UIViewController {
         
         let button = UIButton(type: .system)
         button.setTitle("Register", for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .medium)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .heavy)
         button.setTitleColor(.white, for: .normal)
         button.backgroundColor = #colorLiteral(red: 0.8111879826, green: 0.1042452082, blue: 0.3321437836, alpha: 1)
-        button.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
         button.clipsToBounds = true
-        button.layer.cornerRadius = 25
+        button.layer.cornerRadius = 22
         return button
     }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        setupNotificationObservers()
         setupGradientLayer()
         setupLayout()
+        
+        setupTapGesture()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    fileprivate func setupTapGesture() {
+        
+        view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap(_:))))
+    }
+    
+    @objc fileprivate func handleTap(_ gesture: UITapGestureRecognizer) {
+        
+        self.view.endEditing(true)
+    }
+    
+    fileprivate func setupNotificationObservers() {
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(handleKeyboardShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleKeyboardHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    @objc fileprivate func handleKeyboardHide(_ notification: Notification) {
+        
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
+            
+            self.view.transform = .identity
+            
+        }, completion: nil)
+    }
+    
+    @objc fileprivate func handleKeyboardShow(_ notification: Notification) {
+
+        guard let value = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else { return }
+        let keybaordFrame = value.cgRectValue
+        print(keybaordFrame)
+        
+        let bottomSpace = view.frame.height - stackView.frame.origin.y - stackView.frame.height
+        print(bottomSpace)
+        
+        let differnce = keybaordFrame.height - bottomSpace
+        
+        self.view.transform = CGAffineTransform(translationX: 0, y: -differnce - 8)
     }
     
     fileprivate func setupGradientLayer() {
@@ -88,15 +134,15 @@ class RegistrationController: UIViewController {
         gradientLayer.frame = view.bounds
     }
     
+    lazy var stackView = UIStackView(arrangedSubviews: [
+        selectPhotoButton,
+        fullNameTextField,
+        emailTextField,
+        passwordTextField,
+        registerButton
+        ])
+    
     fileprivate func setupLayout() {
-        
-        let stackView = UIStackView(arrangedSubviews: [
-            selectPhotoButton,
-            fullNameTextField,
-            emailTextField,
-            passwordTextField,
-            registerButton
-            ])
         
         view.addSubview(stackView)
         stackView.axis = .vertical
