@@ -32,12 +32,21 @@ class HomeController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        topStackView.settingsButton.addTarget(self, action: #selector(handleSettingsButton), for: .touchUpInside)
+        
         setupLayout()
         setupDummyCards()
     }
     
-    //MARK: - Setup File Private Methods
+    @objc fileprivate func handleSettingsButton() {
+        
+        let registrationController = RegistrationController()
+        present(registrationController, animated: true, completion: nil)
+        
+    }
     
+    //MARK: - Setup File Private Methods
     fileprivate func setupLayout() {
         let overallStackView = UIStackView(arrangedSubviews: [topStackView, cardsDeckView, bottomStackView])
         overallStackView.axis = .vertical
