@@ -23,6 +23,7 @@
 		C396853B21FD745800E67F65 /* RegistrationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853A21FD745800E67F65 /* RegistrationController.swift */; };
 		C396853D21FD7A6C00E67F65 /* CustomTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853C21FD7A6C00E67F65 /* CustomTextField.swift */; };
 		C396853F21FDA67400E67F65 /* RegistrationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */; };
+		C396854121FDB4C000E67F65 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C396854021FDB4C000E67F65 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +46,7 @@
 		C396853A21FD745800E67F65 /* RegistrationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationController.swift; sourceTree = "<group>"; };
 		C396853C21FD7A6C00E67F65 /* CustomTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomTextField.swift; sourceTree = "<group>"; };
 		C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationViewModel.swift; sourceTree = "<group>"; };
+		C396854021FDB4C000E67F65 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		F82A179476F716179C0F672E /* Pods-Tinder.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Tinder.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Tinder/Pods-Tinder.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -144,6 +146,7 @@
 				C379FC6D21F8A27200DD05C3 /* Main.storyboard */,
 				C379FC7021F8A27200DD05C3 /* Assets.xcassets */,
 				C379FC7221F8A27200DD05C3 /* LaunchScreen.storyboard */,
+				C396854021FDB4C000E67F65 /* GoogleService-Info.plist */,
 				C379FC7521F8A27200DD05C3 /* Info.plist */,
 			);
 			path = Tinder;
@@ -219,6 +222,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C379FC7421F8A27200DD05C3 /* LaunchScreen.storyboard in Resources */,
+				C396854121FDB4C000E67F65 /* GoogleService-Info.plist in Resources */,
 				C379FC7121F8A27200DD05C3 /* Assets.xcassets in Resources */,
 				C379FC6F21F8A27200DD05C3 /* Main.storyboard in Resources */,
 			);

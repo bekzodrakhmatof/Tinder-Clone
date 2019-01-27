@@ -7,6 +7,8 @@
 //
 
 import UIKit
+import Firebase
+import JGProgressHUD
 
 class RegistrationController: UIViewController {
     
@@ -66,6 +68,7 @@ class RegistrationController: UIViewController {
         button.clipsToBounds = true
         button.layer.cornerRadius = 22
         button.isEnabled = false
+        button.addTarget(self, action: #selector(handleRegisterButton), for: .touchUpInside)
         return button
     }()
 
@@ -83,6 +86,35 @@ class RegistrationController: UIViewController {
         super.viewWillDisappear(animated)
         
         NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc fileprivate func handleRegisterButton() {
+        
+        self.handleTap()
+        
+        guard let email = emailTextField.text else { return }
+        guard let password = passwordTextField.text else { return }
+        
+        Auth.auth().createUser(withEmail: email, password: password) { (result, error) in
+            
+            if error != nil {
+                
+                self.showHUDWithError(error: error!)
+                
+                print("Auth Error: ",error as Any)
+            }
+            
+            print("Successfully registered ",result?.user.uid ?? "")
+        }
+    }
+    
+    fileprivate func showHUDWithError(error: Error) {
+        
+        let hud = JGProgressHUD(style: .dark)
+        hud.textLabel.text = "Failed registration"
+        hud.detailTextLabel.text = error.localizedDescription
+        hud.show(in: self.view)
+        hud.dismiss(afterDelay: 4)
     }
     
     let registrationViewModel = RegistrationViewModel()
@@ -121,10 +153,10 @@ class RegistrationController: UIViewController {
     
     fileprivate func setupTapGesture() {
         
-        view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap(_:))))
+        view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
     }
     
-    @objc fileprivate func handleTap(_ gesture: UITapGestureRecognizer) {
+    @objc fileprivate func handleTap() {
         
         self.view.endEditing(true)
     }
