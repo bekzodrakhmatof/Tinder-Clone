@@ -111,7 +111,7 @@ class RegistrationController: UIViewController {
         let keybaordFrame = value.cgRectValue
         print(keybaordFrame)
         
-        let bottomSpace = view.frame.height - stackView.frame.origin.y - stackView.frame.height
+        let bottomSpace = view.frame.height - overllStackView.frame.origin.y - overllStackView.frame.height
         print(bottomSpace)
         
         let differnce = keybaordFrame.height - bottomSpace
@@ -119,9 +119,9 @@ class RegistrationController: UIViewController {
         self.view.transform = CGAffineTransform(translationX: 0, y: -differnce - 8)
     }
     
+    let gradientLayer = CAGradientLayer()
+    
     fileprivate func setupGradientLayer() {
-        
-        let gradientLayer = CAGradientLayer()
         
         let topColor = #colorLiteral(red: 0.9880711436, green: 0.3838337064, blue: 0.3728808165, alpha: 1)
         let bottomColor = #colorLiteral(red: 0.8920591474, green: 0.1065689698, blue: 0.4587435722, alpha: 1)
@@ -134,21 +134,52 @@ class RegistrationController: UIViewController {
         gradientLayer.frame = view.bounds
     }
     
-    lazy var stackView = UIStackView(arrangedSubviews: [
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
+        
+        gradientLayer.frame = view.bounds
+        
+    }
+    
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        
+        if self.traitCollection.verticalSizeClass == .compact {
+            
+            overllStackView.axis = .horizontal
+        } else {
+            
+            overllStackView.axis = .vertical
+        }
+    }
+    
+    lazy var verticalStackView: UIStackView = {
+        
+        let stackView = UIStackView(arrangedSubviews: [
+            fullNameTextField,
+            emailTextField,
+            passwordTextField,
+            registerButton
+            ])
+        stackView.axis = .vertical
+        stackView.distribution = .fillEqually
+        stackView.spacing = 24
+        return stackView
+    }()
+    
+    lazy var overllStackView = UIStackView(arrangedSubviews: [
         selectPhotoButton,
-        fullNameTextField,
-        emailTextField,
-        passwordTextField,
-        registerButton
+        verticalStackView
         ])
     
     fileprivate func setupLayout() {
         
-        view.addSubview(stackView)
-        stackView.axis = .vertical
-        stackView.spacing = 8
+        view.addSubview(overllStackView)
+        overllStackView.axis = .horizontal
+        overllStackView.spacing = 24
         
-        stackView.anchor(top: nil, leading: view.leadingAnchor, bottom: nil, trailing: view.trailingAnchor, padding: .init(top: 0, left: 50, bottom: 0, right: -50))
-        stackView.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
+        selectPhotoButton.widthAnchor.constraint(equalToConstant: 275).isActive = true
+        
+        overllStackView.anchor(top: nil, leading: view.leadingAnchor, bottom: nil, trailing: view.trailingAnchor, padding: .init(top: 0, left: 50, bottom: 0, right: -50))
+        overllStackView.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
     }
 }
