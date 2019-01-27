@@ -86,8 +86,6 @@ class RegistrationController: UIViewController {
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        
-        NotificationCenter.default.removeObserver(self)
     }
     
     @objc fileprivate func handleSelectPhoto() {
@@ -97,28 +95,28 @@ class RegistrationController: UIViewController {
         present(imagePickerController, animated: true, completion: nil)
     }
     
+    let registeringHUD = JGProgressHUD(style: .dark)
+    
     @objc fileprivate func handleRegisterButton() {
         
         self.handleTap()
         
-        guard let email = emailTextField.text else { return }
-        guard let password = passwordTextField.text else { return }
-        
-        Auth.auth().createUser(withEmail: email, password: password) { (result, error) in
+        registrationViewModel.bindableIsRegistering.value = true
+        registrationViewModel.perfromRegistration { [weak self] (error) in
             
-            if error != nil {
+            if let error = error {
                 
-                self.showHUDWithError(error: error!)
-                
-                print("Auth Error: ",error as Any)
+                self?.showHUDWithError(error: error)
+                return
             }
             
-            print("Successfully registered ",result?.user.uid ?? "")
+            print("Finished registering")
         }
     }
     
     fileprivate func showHUDWithError(error: Error) {
         
+        registeringHUD.dismiss(animated: true)
         let hud = JGProgressHUD(style: .dark)
         hud.textLabel.text = "Failed registration"
         hud.detailTextLabel.text = error.localizedDescription
@@ -128,6 +126,7 @@ class RegistrationController: UIViewController {
     
     let registrationViewModel = RegistrationViewModel()
     
+    //MARK: - Register Model View Bindable
     fileprivate func setupRegistrationViewModelObservers() {
         
         registrationViewModel.bindableIsFormValid.bind { [unowned self] (isFormValid) in
@@ -146,6 +145,17 @@ class RegistrationController: UIViewController {
         registrationViewModel.bindableImage.bind { [unowned self] (image) in
             
             self.selectPhotoButton.setImage(image?.withRenderingMode(.alwaysOriginal), for: .normal)
+        }
+        
+        registrationViewModel.bindableIsRegistering.bind { [unowned self] (isRegistering) in
+            
+            if isRegistering == true {
+                
+                self.registeringHUD.textLabel.text = "Register"
+                self.registeringHUD.show(in: self.view)
+            } else {
+                self.registeringHUD.dismiss(animated: true)
+            }
         }
     }
     
