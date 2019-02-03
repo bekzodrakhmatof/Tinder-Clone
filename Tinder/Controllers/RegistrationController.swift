@@ -73,6 +73,15 @@ class RegistrationController: UIViewController {
         button.addTarget(self, action: #selector(handleRegisterButton), for: .touchUpInside)
         return button
     }()
+    
+    let goToLoginButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Go to Login", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .heavy)
+        button.addTarget(self, action: #selector(handleGoToLogin), for: .touchUpInside)
+        return button
+    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -86,6 +95,12 @@ class RegistrationController: UIViewController {
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+    }
+    
+    @objc fileprivate func handleGoToLogin() {
+        
+        let loginController = LoginController()
+        navigationController?.pushViewController(loginController, animated: true)
     }
     
     @objc fileprivate func handleSelectPhoto() {
@@ -265,6 +280,7 @@ class RegistrationController: UIViewController {
     
     fileprivate func setupLayout() {
         
+        navigationController?.isNavigationBarHidden = true
         view.addSubview(overllStackView)
         overllStackView.axis = .horizontal
         overllStackView.spacing = 24
@@ -273,6 +289,9 @@ class RegistrationController: UIViewController {
         
         overllStackView.anchor(top: nil, leading: view.leadingAnchor, bottom: nil, trailing: view.trailingAnchor, padding: .init(top: 0, left: 50, bottom: 0, right: -50))
         overllStackView.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
+        
+        view.addSubview(goToLoginButton)
+        goToLoginButton.anchor(top: nil, leading: view.leadingAnchor, bottom: view.safeAreaLayoutGuide.bottomAnchor, trailing: view.trailingAnchor)
     }
 }
 

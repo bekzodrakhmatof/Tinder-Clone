@@ -362,6 +362,7 @@ class SettingsController: UITableViewController, UIImagePickerControllerDelegate
     
     @objc fileprivate func handleLogoutButton() {
         
-        dismiss(animated: true, completion: nil)
+        try? Auth.auth().signOut()
+        dismiss(animated: true)
     }
 }

@@ -11,7 +11,7 @@ import Firebase
 import FirebaseFirestore
 import JGProgressHUD
 
-class HomeController: UIViewController, SettingsControllerDelegate {
+class HomeController: UIViewController, SettingsControllerDelegate, LoginControllerDelegate {
     
     let topStackView    = TopNavigationStackView()
     let cardsDeckView   = UIView()
@@ -25,6 +25,23 @@ class HomeController: UIViewController, SettingsControllerDelegate {
         topStackView.settingsButton.addTarget(self, action: #selector(handleSettingsButton), for: .touchUpInside)
         bottomControls.refreshButton.addTarget(self, action: #selector(handleRefreshButton), for: .touchUpInside)
         setupLayout()
+        fetchCurrentUser()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        if Auth.auth().currentUser == nil {
+            
+            let loginController = LoginController()
+            loginController.loginDelegate = self
+            let navigationController = UINavigationController(rootViewController: loginController)
+            present(navigationController, animated: true, completion: nil)
+        }
+    }
+    
+    func didFinishLoggingIn() {
+        
         fetchCurrentUser()
     }
     

@@ -19,6 +19,8 @@
 		C36CFB3A2206D40900437F6F /* SettingsCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36CFB392206D40900437F6F /* SettingsCell.swift */; };
 		C36CFB3C2206F36100437F6F /* AgeRangeCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36CFB3B2206F36100437F6F /* AgeRangeCell.swift */; };
 		C36CFB3E220709D100437F6F /* Firebase+Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36CFB3D220709D100437F6F /* Firebase+Utils.swift */; };
+		C36CFB40220714D900437F6F /* LoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36CFB3F220714D900437F6F /* LoginController.swift */; };
+		C36CFB4222072AB300437F6F /* LoginViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36CFB4122072AB300437F6F /* LoginViewModel.swift */; };
 		C379FC6A21F8A27200DD05C3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C379FC6921F8A27200DD05C3 /* AppDelegate.swift */; };
 		C379FC6C21F8A27200DD05C3 /* HomeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C379FC6B21F8A27200DD05C3 /* HomeController.swift */; };
 		C379FC6F21F8A27200DD05C3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C379FC6D21F8A27200DD05C3 /* Main.storyboard */; };
@@ -45,6 +47,8 @@
 		C36CFB392206D40900437F6F /* SettingsCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCell.swift; sourceTree = "<group>"; };
 		C36CFB3B2206F36100437F6F /* AgeRangeCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgeRangeCell.swift; sourceTree = "<group>"; };
 		C36CFB3D220709D100437F6F /* Firebase+Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Firebase+Utils.swift"; sourceTree = "<group>"; };
+		C36CFB3F220714D900437F6F /* LoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginController.swift; sourceTree = "<group>"; };
+		C36CFB4122072AB300437F6F /* LoginViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewModel.swift; sourceTree = "<group>"; };
 		C379FC6621F8A27200DD05C3 /* Tinder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tinder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C379FC6921F8A27200DD05C3 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		C379FC6B21F8A27200DD05C3 /* HomeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeController.swift; sourceTree = "<group>"; };
@@ -119,6 +123,8 @@
 				C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */,
 				C396854221FDC0F400E67F65 /* Bindable.swift */,
 				C36CFB372206C2E300437F6F /* SettingsController.swift */,
+				C36CFB3F220714D900437F6F /* LoginController.swift */,
+				C36CFB4122072AB300437F6F /* LoginViewModel.swift */,
 			);
 			path = Controllers;
 			sourceTree = "<group>";
@@ -326,9 +332,11 @@
 				C34D49A321FC449A008E8010 /* CardViewModel.swift in Sources */,
 				C34D499C21FC2563008E8010 /* CardView.swift in Sources */,
 				C36CFB382206C2E300437F6F /* SettingsController.swift in Sources */,
+				C36CFB40220714D900437F6F /* LoginController.swift in Sources */,
 				C34D499A21FC175C008E8010 /* TopNavigationStackView.swift in Sources */,
 				C396853B21FD745800E67F65 /* RegistrationController.swift in Sources */,
 				C34D499F21FC3921008E8010 /* User.swift in Sources */,
+				C36CFB4222072AB300437F6F /* LoginViewModel.swift in Sources */,
 				C36CFB3A2206D40900437F6F /* SettingsCell.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
