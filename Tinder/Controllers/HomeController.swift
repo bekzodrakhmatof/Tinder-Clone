@@ -11,8 +11,8 @@ import Firebase
 import FirebaseFirestore
 import JGProgressHUD
 
-class HomeController: UIViewController {
-
+class HomeController: UIViewController, SettingsControllerDelegate {
+    
     let topStackView    = TopNavigationStackView()
     let cardsDeckView   = UIView()
     let bottomControls = HomeBottomControlsStackView()
@@ -25,7 +25,24 @@ class HomeController: UIViewController {
         topStackView.settingsButton.addTarget(self, action: #selector(handleSettingsButton), for: .touchUpInside)
         bottomControls.refreshButton.addTarget(self, action: #selector(handleRefreshButton), for: .touchUpInside)
         setupLayout()
-        fetchUsersFromFirebase()
+        fetchCurrentUser()
+    }
+    
+    fileprivate var user: User?
+    
+    fileprivate func fetchCurrentUser() {
+        
+        cardsDeckView.subviews.forEach({$0.removeFromSuperview()})
+        Firestore.firestore().fetchCurrentUser { (user, error) in
+            
+            if let error = error {
+                print("Error, \(error)")
+                return
+            }
+            
+            self.user = user
+            self.fetchUsersFromFirebase()
+        }
     }
     
     @objc fileprivate func handleRefreshButton() {
@@ -37,11 +54,12 @@ class HomeController: UIViewController {
     
     fileprivate func fetchUsersFromFirebase() {
         
+        guard let minAge = user?.minSeekingAge, let maxAge = user?.maxSeekingAge else { return }
         let hud = JGProgressHUD(style: .dark)
         hud.textLabel.text = "Fetching Users"
         hud.show(in: view)
         
-        let query = Firestore.firestore().collection("users").order(by: "uid").start(after: [lastFetchedUser?.uid ?? ""]).limit(to: 2)
+        let query = Firestore.firestore().collection("users").whereField("age", isGreaterThan: minAge).whereField("age", isLessThan: maxAge)
         
         query.getDocuments { (snapshot, error) in
             
@@ -76,9 +94,15 @@ class HomeController: UIViewController {
     @objc fileprivate func handleSettingsButton() {
         
         let settingsController = SettingsController()
+        settingsController.settingDelegate = self
         let navigationController = UINavigationController(rootViewController: settingsController)
         present(navigationController, animated: true, completion: nil)
         
+    }
+    
+    func didSaveSettings() {
+        
+        fetchCurrentUser()
     }
     
     //MARK: - Setup File Private Methods
@@ -100,7 +124,6 @@ class HomeController: UIViewController {
     
     fileprivate func setupFirestoreUserCards() {
     
-        print("Card View \(cardViewModels.count)")
         cardViewModels.forEach { (cardViewModel) in
             
             let cardView = CardView(frame: .zero)
