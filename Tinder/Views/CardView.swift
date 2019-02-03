@@ -41,9 +41,12 @@ class CardView: UIView {
     
     fileprivate func setupImageIndexObserver() {
         
-        cardViewModel.imageIndexObserver = { [weak self] (imageIndex, image) in
+        cardViewModel.imageIndexObserver = { [weak self] (imageIndex, imageUrl) in
             
-            self?.imageView.image = image
+            if let url = URL(string: imageUrl ?? "") {
+                
+                self?.imageView.sd_setImage(with: url)
+            }
             
             self?.barsStackView.arrangedSubviews.forEach { (view) in
                 

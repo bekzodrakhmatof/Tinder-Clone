@@ -15,22 +15,6 @@ class HomeController: UIViewController {
     let cardsDeckView   = UIView()
     let bottomStackView = HomeBottomControlsStackView()
     
-//    let cardViewModels: [CardViewModel] = {
-//        let producers = [
-//            User(name: "Kelly", age: 23, profession: "Music DJ", imageNames: ["kelly1", "kell21", "kelly3"]),
-//            User(name: "Jane", age: 18, profession: "Teacher", imageNames: ["jane1", "jane2", "jane3"]),
-//            Advertiser(title: "Slide Out Menu", brandName: "Lets Build That App", posterPhotoName: "slide_out_menu_poster"),
-//            User(name: "Jane", age: 18, profession: "Teacher", imageNames: ["jane1", "jane2", "jane3"]),
-//            User(name: "Kelly", age: 23, profession: "Music DJ", imageNames: ["lady5c"]),
-//            User(name: "Jane", age: 18, profession: "Teacher", imageNames: ["jane1", "jane2", "jane3"]),
-//            Advertiser(title: "Slide Out Menu", brandName: "Lets Build That App", posterPhotoName: "slide_out_menu_poster"),
-//            User(name: "Jane", age: 18, profession: "Teacher", imageNames: ["jane1", "jane2", "jane3"])
-//        ] as [ProducesCardViewModel]
-//
-//        let viewModels = producers.map({ return $0.toCardViewModel()})
-//        return viewModels
-//    }()
-    
     var cardViewModels = [CardViewModel]()
     
     override func viewDidLoad() {
@@ -39,13 +23,14 @@ class HomeController: UIViewController {
         topStackView.settingsButton.addTarget(self, action: #selector(handleSettingsButton), for: .touchUpInside)
         
         setupLayout()
-        setupDummyCards()
         fetchUsersFromFirebase()
     }
     
     fileprivate func fetchUsersFromFirebase() {
         
-        Firestore.firestore().collection("users").getDocuments { (snapshot, error) in
+        let query = Firestore.firestore().collection("users")
+        
+        query.getDocuments { (snapshot, error) in
             
             if let error = error {
                 print("Error: \(error)")
@@ -59,7 +44,7 @@ class HomeController: UIViewController {
                 let user = User(dictionary: userDictionary)
                 self.cardViewModels.append(user.toCardViewModel())
                 print(userDictionary)
-                self.setupDummyCards()
+                self.setupFirestoreUserCards()
             })
         }
     }
@@ -88,7 +73,7 @@ class HomeController: UIViewController {
         overallStackView.bringSubviewToFront(cardsDeckView)
     }
     
-    fileprivate func setupDummyCards() {
+    fileprivate func setupFirestoreUserCards() {
     
         cardViewModels.forEach { (cardViewModel) in
             
