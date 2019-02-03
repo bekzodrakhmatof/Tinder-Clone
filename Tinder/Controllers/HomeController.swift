@@ -8,12 +8,14 @@
 
 import UIKit
 import Firebase
+import FirebaseFirestore
+import JGProgressHUD
 
 class HomeController: UIViewController {
 
     let topStackView    = TopNavigationStackView()
     let cardsDeckView   = UIView()
-    let bottomStackView = HomeBottomControlsStackView()
+    let bottomControls = HomeBottomControlsStackView()
     
     var cardViewModels = [CardViewModel]()
     
@@ -21,16 +23,29 @@ class HomeController: UIViewController {
         super.viewDidLoad()
         
         topStackView.settingsButton.addTarget(self, action: #selector(handleSettingsButton), for: .touchUpInside)
-        
+        bottomControls.refreshButton.addTarget(self, action: #selector(handleRefreshButton), for: .touchUpInside)
         setupLayout()
         fetchUsersFromFirebase()
     }
     
+    @objc fileprivate func handleRefreshButton() {
+        
+        fetchUsersFromFirebase()
+    }
+    
+    var lastFetchedUser: User?
+    
     fileprivate func fetchUsersFromFirebase() {
         
-        let query = Firestore.firestore().collection("users")
+        let hud = JGProgressHUD(style: .dark)
+        hud.textLabel.text = "Fetching Users"
+        hud.show(in: view)
+        
+        let query = Firestore.firestore().collection("users").order(by: "uid").start(after: [lastFetchedUser?.uid ?? ""]).limit(to: 2)
         
         query.getDocuments { (snapshot, error) in
+            
+            hud.dismiss()
             
             if let error = error {
                 print("Error: \(error)")
@@ -43,10 +58,19 @@ class HomeController: UIViewController {
                 
                 let user = User(dictionary: userDictionary)
                 self.cardViewModels.append(user.toCardViewModel())
-                print(userDictionary)
-                self.setupFirestoreUserCards()
+                self.lastFetchedUser = user
+                self.setupCardFromUser(user: user)
             })
         }
+    }
+    
+    fileprivate func setupCardFromUser(user: User) {
+        
+        let cardView = CardView(frame: .zero)
+        cardView.cardViewModel = user.toCardViewModel()
+        cardsDeckView.addSubview(cardView)
+        cardsDeckView.sendSubviewToBack(cardView)
+        cardView.fillSuperview()
     }
     
     @objc fileprivate func handleSettingsButton() {
@@ -61,7 +85,7 @@ class HomeController: UIViewController {
         
         view.backgroundColor = .white
         
-        let overallStackView = UIStackView(arrangedSubviews: [topStackView, cardsDeckView, bottomStackView])
+        let overallStackView = UIStackView(arrangedSubviews: [topStackView, cardsDeckView, bottomControls])
         overallStackView.axis = .vertical
         view.addSubview(overallStackView)
         
@@ -75,6 +99,7 @@ class HomeController: UIViewController {
     
     fileprivate func setupFirestoreUserCards() {
     
+        print("Card View \(cardViewModels.count)")
         cardViewModels.forEach { (cardViewModel) in
             
             let cardView = CardView(frame: .zero)
