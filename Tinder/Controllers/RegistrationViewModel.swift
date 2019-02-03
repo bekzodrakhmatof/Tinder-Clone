@@ -33,27 +33,53 @@ class RegistrationViewModel {
                 return
             }
             
-            // You can only upload
-            let fileName = UUID().uuidString
-            let reference = Storage.storage().reference(withPath: "/images/\(fileName).jpg")
-            let imageData = self.bindableImage.value?.jpegData(compressionQuality: 0.75) ?? Data()
-            reference.putData(imageData, metadata: nil, completion: { (_, err) in
+            self.saveImageToFirebase(completion: completion)
+
+        }
+    }
+    
+    fileprivate func saveImageToFirebase(completion: @escaping (Error?) -> ()) {
+        
+        // You can only upload
+        let fileName = UUID().uuidString
+        let reference = Storage.storage().reference(withPath: "/images/\(fileName).jpg")
+        let imageData = self.bindableImage.value?.jpegData(compressionQuality: 0.75) ?? Data()
+        reference.putData(imageData, metadata: nil, completion: { (_, err) in
+            
+            if let err = err {
+                completion(err)
+                return
+            }
+            
+            reference.downloadURL(completion: { (url, error) in
                 
-                if let err = err {
-                    completion(err)
+                if let error = error {
+                    completion(error)
                     return
                 }
                 
-                reference.downloadURL(completion: { (url, error) in
-                    
-                    if let error = error {
-                        completion(error)
-                        return
-                    }
-                    
-                    self.bindableIsRegistering.value = false
-                })
+                let imageUrl = url?.absoluteString ?? ""
+                
+                self.bindableIsRegistering.value = false
+                self.saveInfoToFirestore(imageURL: imageUrl, completion: completion)
             })
+        })
+    }
+    
+    fileprivate func saveInfoToFirestore(imageURL: String, completion: @escaping (Error?) -> ()) {
+        
+        let uid = Auth.auth().currentUser?.uid ?? ""
+        let documentData = ["fullName": fullName ?? "", "uid": uid, "imageUrl1": imageURL]
+        
+        Firestore.firestore().collection("users").document(uid).setData(documentData) { (error) in
+            
+            if let error = error {
+                
+                completion(error)
+                return
+            }
+            
+            completion(nil)
         }
     }
     
