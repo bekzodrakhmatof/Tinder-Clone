@@ -25,8 +25,6 @@ class CardView: UIView {
             informationLabel.attributedText = cardViewModel.attributedString
             informationLabel.textAlignment = cardViewModel.textAlignment
             
-            print("cardViewModel.imageNames.count \(cardViewModel.imageNames.count)")
-            // Dummy bars for now
             (0..<cardViewModel.imageNames.count).forEach { (_) in
                 let barView = UIView()
                 barView.backgroundColor = barDeselectedColor
