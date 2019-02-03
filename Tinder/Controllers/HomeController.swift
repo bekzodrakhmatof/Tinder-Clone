@@ -75,8 +75,9 @@ class HomeController: UIViewController {
     
     @objc fileprivate func handleSettingsButton() {
         
-        let registrationController = RegistrationController()
-        present(registrationController, animated: true, completion: nil)
+        let settingsController = SettingsController()
+        let navigationController = UINavigationController(rootViewController: settingsController)
+        present(navigationController, animated: true, completion: nil)
         
     }
     
