@@ -32,6 +32,7 @@
 		C396854121FDB4C000E67F65 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C396854021FDB4C000E67F65 /* GoogleService-Info.plist */; };
 		C396854321FDC0F400E67F65 /* Bindable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396854221FDC0F400E67F65 /* Bindable.swift */; };
 		C3A2E3C32207DD9B00D95674 /* UserDetailsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A2E3C22207DD9B00D95674 /* UserDetailsController.swift */; };
+		C3A2E3C52208488B00D95674 /* SwipePhotosController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A2E3C42208488B00D95674 /* SwipePhotosController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +64,7 @@
 		C396854021FDB4C000E67F65 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C396854221FDC0F400E67F65 /* Bindable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bindable.swift; sourceTree = "<group>"; };
 		C3A2E3C22207DD9B00D95674 /* UserDetailsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailsController.swift; sourceTree = "<group>"; };
+		C3A2E3C42208488B00D95674 /* SwipePhotosController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipePhotosController.swift; sourceTree = "<group>"; };
 		F82A179476F716179C0F672E /* Pods-Tinder.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Tinder.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Tinder/Pods-Tinder.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -128,6 +130,7 @@
 				C36CFB3F220714D900437F6F /* LoginController.swift */,
 				C36CFB4122072AB300437F6F /* LoginViewModel.swift */,
 				C3A2E3C22207DD9B00D95674 /* UserDetailsController.swift */,
+				C3A2E3C42208488B00D95674 /* SwipePhotosController.swift */,
 			);
 			path = Controllers;
 			sourceTree = "<group>";
@@ -340,6 +343,7 @@
 				C34D499A21FC175C008E8010 /* TopNavigationStackView.swift in Sources */,
 				C396853B21FD745800E67F65 /* RegistrationController.swift in Sources */,
 				C34D499F21FC3921008E8010 /* User.swift in Sources */,
+				C3A2E3C52208488B00D95674 /* SwipePhotosController.swift in Sources */,
 				C36CFB4222072AB300437F6F /* LoginViewModel.swift in Sources */,
 				C36CFB3A2206D40900437F6F /* SettingsCell.swift in Sources */,
 			);
