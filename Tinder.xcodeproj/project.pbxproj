@@ -31,6 +31,7 @@
 		C396853F21FDA67400E67F65 /* RegistrationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */; };
 		C396854121FDB4C000E67F65 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C396854021FDB4C000E67F65 /* GoogleService-Info.plist */; };
 		C396854321FDC0F400E67F65 /* Bindable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C396854221FDC0F400E67F65 /* Bindable.swift */; };
+		C3A2E3C32207DD9B00D95674 /* UserDetailsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A2E3C22207DD9B00D95674 /* UserDetailsController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +62,7 @@
 		C396853E21FDA67400E67F65 /* RegistrationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationViewModel.swift; sourceTree = "<group>"; };
 		C396854021FDB4C000E67F65 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C396854221FDC0F400E67F65 /* Bindable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bindable.swift; sourceTree = "<group>"; };
+		C3A2E3C22207DD9B00D95674 /* UserDetailsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailsController.swift; sourceTree = "<group>"; };
 		F82A179476F716179C0F672E /* Pods-Tinder.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Tinder.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Tinder/Pods-Tinder.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -125,6 +127,7 @@
 				C36CFB372206C2E300437F6F /* SettingsController.swift */,
 				C36CFB3F220714D900437F6F /* LoginController.swift */,
 				C36CFB4122072AB300437F6F /* LoginViewModel.swift */,
+				C3A2E3C22207DD9B00D95674 /* UserDetailsController.swift */,
 			);
 			path = Controllers;
 			sourceTree = "<group>";
@@ -326,6 +329,7 @@
 				C34D499821FC120B008E8010 /* HomeBottomControlsStackView.swift in Sources */,
 				C34D49A521FC51BD008E8010 /* Advertiser.swift in Sources */,
 				C379FC6A21F8A27200DD05C3 /* AppDelegate.swift in Sources */,
+				C3A2E3C32207DD9B00D95674 /* UserDetailsController.swift in Sources */,
 				C36CFB3C2206F36100437F6F /* AgeRangeCell.swift in Sources */,
 				C34D499521FBFF63008E8010 /* Extensions+UIView.swift in Sources */,
 				C36CFB3E220709D100437F6F /* Firebase+Utils.swift in Sources */,

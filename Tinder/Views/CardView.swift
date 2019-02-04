@@ -9,7 +9,13 @@
 import UIKit
 import SDWebImage
 
+protocol CardViewDelegate {
+    func didTapMoreInfo()
+}
+
 class CardView: UIView {
+    
+    var cardViewDelegate: CardViewDelegate?
     
     var cardViewModel: CardViewModel! {
         
@@ -76,6 +82,19 @@ class CardView: UIView {
         addGestureRecognizer(tapGesture)
     }
     
+    fileprivate let moreInfoButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(#imageLiteral(resourceName: "info_icon").withRenderingMode(.alwaysOriginal), for: .normal)
+        button.addTarget(self, action: #selector(handelMoreInfoButton), for: .touchUpInside)
+        return button
+    }()
+    
+    @objc fileprivate func handelMoreInfoButton() {
+        
+        // Use delegate
+        cardViewDelegate?.didTapMoreInfo()
+    }
+    
     fileprivate func setupLayout() {
         
         layer.cornerRadius = 10
@@ -95,6 +114,9 @@ class CardView: UIView {
         informationLabel.numberOfLines = 0
         
         informationLabel.anchor(top: nil, leading: leadingAnchor, bottom: bottomAnchor, trailing: trailingAnchor, padding: .init(top: 0, left: 16, bottom: -16, right: 16))
+        
+        addSubview(moreInfoButton)
+        moreInfoButton.anchor(top: nil, leading: nil, bottom: bottomAnchor, trailing: trailingAnchor, padding: .init(top: 0, left: 0, bottom: -16, right: -16), size: .init(width: 44, height: 44))
     }
     
     fileprivate let barsStackView = UIStackView()
