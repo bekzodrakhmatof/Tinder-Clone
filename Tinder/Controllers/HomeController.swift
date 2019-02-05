@@ -117,16 +117,55 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
     
     var topCardView: CardView?
     
-    @objc fileprivate func handleLikeButton() {
+    @objc func handleLikeButton() {
         
+        saveSwipeInformationToFirestore(didLike: 1)
         performSwipeAnimation(translation: 700, angle: 15)
 
     }
     
-    @objc fileprivate func handleDislikeButton() {
+    @objc func handleDislikeButton() {
         
-        performSwipeAnimation(translation: -700, angle: -15)
+        saveSwipeInformationToFirestore(didLike: 0)
+        performSwipeAnimation(translation: -700, angle: -10)
         
+    }
+    
+    fileprivate func saveSwipeInformationToFirestore(didLike: Int) {
+        
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        
+        guard let cardUID = topCardView?.cardViewModel.uid else { return }
+        
+        let documentData = [cardUID: didLike]
+        Firestore.firestore().collection("swipes").document(uid).getDocument { (snapshotData, error) in
+            if let error = error {
+                print("Failed to fetch swipe document: ",error)
+                return
+            }
+            
+            if snapshotData?.exists == true {
+                
+                Firestore.firestore().collection("swipes").document(uid).updateData(documentData) { (error) in
+                    if let error = error {
+                        print("Failed to update swipe data: ",error)
+                        return
+                    }
+                    
+                    print("Successfully updated swiped...")
+                }
+            } else {
+                
+                Firestore.firestore().collection("swipes").document(uid).setData(documentData) { (error) in
+                    if let error = error {
+                        print("Failed to save swipe data: ",error)
+                        return
+                    }
+                    
+                    print("Successfully saved swiped...")
+                }
+            }
+        }
     }
     
     func didRemoveCard(cardView: CardView) {
@@ -137,7 +176,7 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
     
     fileprivate func performSwipeAnimation(translation: CGFloat, angle: CGFloat) {
         
-        let duration = 0.6
+        let duration = 0.7
         let translationAnimation = CABasicAnimation(keyPath: "position.x")
         translationAnimation.toValue = translation
         translationAnimation.duration = duration
