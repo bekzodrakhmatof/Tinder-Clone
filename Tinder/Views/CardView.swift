@@ -163,27 +163,6 @@ class CardView: UIView {
                 self.transform = .identity
             })
         }
-        
-//        UIView.animate(withDuration: 1, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.1, options: .curveEaseOut, animations: {
-//            if shouldDismissCard {
-//
-//                self.frame = CGRect(x: frameToSide * 10, y: 0, width: self.frame.size.width, height: self.frame.size.height)
-//
-//            } else {
-//
-//                self.transform = .identity
-//            }
-//
-//        }) { (_) in
-//
-//            self.transform = .identity
-//
-//            if shouldDismissCard {
-//
-//                self.removeFromSuperview()
-//                self.cardViewDelegate?.didRemoveCard(cardView: self)
-//            }
-//        }
     }
     
     required init?(coder aDecoder: NSCoder) {
