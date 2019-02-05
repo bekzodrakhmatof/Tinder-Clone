@@ -24,6 +24,8 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
         
         topStackView.settingsButton.addTarget(self, action: #selector(handleSettingsButton), for: .touchUpInside)
         bottomControls.refreshButton.addTarget(self, action: #selector(handleRefreshButton), for: .touchUpInside)
+        bottomControls.likeButton.addTarget(self, action: #selector(handleLikeButton), for: .touchUpInside)
+        bottomControls.dislikeButton.addTarget(self, action: #selector(handleDislikeButton), for: .touchUpInside)
         setupLayout()
         fetchCurrentUser()
     }
@@ -89,21 +91,56 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
                 return
             }
             
+            var prevoiusCardView: CardView?
+            
             snapshot?.documents.forEach({ (documentSnapshot) in
                 
                 let userDictionary = documentSnapshot.data()
                 let user = User(dictionary: userDictionary)
                 if user.uid != Auth.auth().currentUser?.uid {
-                    self.setupCardFromUser(user: user)
+                    
+                    let cardView = self.setupCardFromUser(user: user)
+                    
+                    prevoiusCardView?.nextCardView = cardView
+                    prevoiusCardView = cardView
+                    
+                    if self.topCardView == nil {
+                        
+                        self.topCardView = cardView
+                    }
                 }
-//                self.cardViewModels.append(user.toCardViewModel())
-//                self.lastFetchedUser = user
-                
             })
         }
     }
     
-    fileprivate func setupCardFromUser(user: User) {
+    var topCardView: CardView?
+    
+    @objc fileprivate func handleLikeButton() {
+        
+        UIView.animate(withDuration: 1.0, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.1, options: .curveEaseOut, animations: {
+            
+            self.topCardView?.frame = CGRect(x: 60 * 10, y: 0, width: self.topCardView!.frame.size.width, height: self.topCardView!.frame.size.height)
+            let angle = 15 * CGFloat.pi / 180
+            self.topCardView?.transform = CGAffineTransform(rotationAngle: angle)
+        }) { (_) in
+            
+            self.topCardView?.removeFromSuperview()
+            self.topCardView = self.topCardView?.nextCardView
+        }
+    }
+    
+    func didRemoveCard(cardView: CardView) {
+        
+        self.topCardView?.removeFromSuperview()
+        self.topCardView = self.topCardView?.nextCardView
+    }
+    
+    @objc fileprivate func handleDislikeButton() {
+        
+        print("Dislike button")
+    }
+    
+    fileprivate func setupCardFromUser(user: User) -> CardView {
         
         let cardView = CardView(frame: .zero)
         cardView.cardViewModel = user.toCardViewModel()
@@ -111,6 +148,8 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
         cardsDeckView.addSubview(cardView)
         cardsDeckView.sendSubviewToBack(cardView)
         cardView.fillSuperview()
+        
+        return cardView
     }
     
     func didTapMoreInfo(cardViewModel: CardViewModel) {
