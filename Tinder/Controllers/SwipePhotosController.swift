@@ -9,24 +9,25 @@
 import UIKit
 
 class SwipePhotosController: UIPageViewController, UIPageViewControllerDataSource {
-
-    let controllers = [
     
-        PhotoController(image: #imageLiteral(resourceName: "jane1")),
-        PhotoController(image: #imageLiteral(resourceName: "kelly1")),
-        PhotoController(image: #imageLiteral(resourceName: "jane2")),
-        PhotoController(image: #imageLiteral(resourceName: "photo_placeholder")),
-        PhotoController(image: #imageLiteral(resourceName: "slide_out_menu_poster")),
-        PhotoController(image: #imageLiteral(resourceName: "lady5c")),
-        PhotoController(image: #imageLiteral(resourceName: "jane3"))
-    ]
+    var controllers = [UIViewController]()
+    
+    var cardViewModel: CardViewModel! {
+        didSet {
+            controllers = cardViewModel.imageUrls.map({ (imageUrl) -> UIViewController in
+                let photoController = PhotoController(imageUrl: imageUrl)
+                return photoController
+            })
+            
+            setViewControllers([controllers.first!], direction: .forward, animated: false, completion: nil)
+        }
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         dataSource = self
         view.backgroundColor = .white
-    
-        setViewControllers([controllers.first!], direction: .forward, animated: false, completion: nil)
     }
     
     func pageViewController(_ pageViewController: UIPageViewController, viewControllerAfter viewController: UIViewController) -> UIViewController? {
@@ -50,8 +51,11 @@ class PhotoController: UIViewController {
     
     let imageView = UIImageView(image: #imageLiteral(resourceName: "jane3"))
     
-    init(image: UIImage) {
-        imageView.image = image
+    init(imageUrl: String) {
+        
+        if let url = URL(string: imageUrl) {
+            imageView.sd_setImage(with: url)
+        }
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -64,6 +68,7 @@ class PhotoController: UIViewController {
         
         view.addSubview(imageView)
         imageView.fillSuperview()
-        imageView.contentMode = .scaleAspectFit
+        imageView.clipsToBounds = true
+        imageView.contentMode = .scaleAspectFill
     }
 }
