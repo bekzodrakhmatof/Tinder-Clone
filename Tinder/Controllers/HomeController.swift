@@ -33,9 +33,9 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
         
         if Auth.auth().currentUser == nil {
             
-            let loginController = LoginController()
-            loginController.loginDelegate = self
-            let navigationController = UINavigationController(rootViewController: loginController)
+            let registrationController = RegistrationController()
+            registrationController.loginControllerDelegate = self
+            let navigationController = UINavigationController(rootViewController: registrationController)
             present(navigationController, animated: true, completion: nil)
         }
     }

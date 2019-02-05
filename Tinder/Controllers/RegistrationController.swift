@@ -12,6 +12,8 @@ import JGProgressHUD
 
 class RegistrationController: UIViewController {
     
+    var loginControllerDelegate: LoginControllerDelegate?
+    
     // UI Components
     let selectPhotoButton: UIButton = {
         
@@ -93,13 +95,10 @@ class RegistrationController: UIViewController {
         setupRegistrationViewModelObservers()
     }
     
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-    }
-    
     @objc fileprivate func handleGoToLogin() {
         
         let loginController = LoginController()
+        loginController.loginDelegate = loginControllerDelegate
         navigationController?.pushViewController(loginController, animated: true)
     }
     
@@ -115,8 +114,7 @@ class RegistrationController: UIViewController {
     @objc fileprivate func handleRegisterButton() {
         
         self.handleTap()
-        
-        registrationViewModel.bindableIsRegistering.value = true
+
         registrationViewModel.perfromRegistration { [weak self] (error) in
             
             if let error = error {
@@ -126,6 +124,9 @@ class RegistrationController: UIViewController {
             }
             
             print("Finished registering")
+            self?.dismiss(animated: true, completion: {
+                self?.loginControllerDelegate?.didFinishLoggingIn()
+            })
         }
     }
     

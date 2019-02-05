@@ -84,6 +84,7 @@ class LoginController: UIViewController {
     @objc fileprivate func handleLoginButton() {
         
         loginViewModel.performLogin { (error) in
+            self.loginHUD.dismiss()
             if let error = error {
                 print("Failed to login: \(error)")
             }
@@ -130,7 +131,7 @@ class LoginController: UIViewController {
         loginViewModel.isLogedIn.bind { [unowned self] (isRegistering) in
             
             if isRegistering == true {
-                self.loginHUD.textLabel.text = "Loging..."
+                self.loginHUD.textLabel.text = "Registering..."
                 self.loginHUD.show(in: self.view)
             } else {
                 self.loginHUD.dismiss()
