@@ -7,7 +7,7 @@ Used: Open Source Code from CocoaPods
 
 Firebase SDK - Save user information and fetch.                              
 JGProgressHUD -  To show progress view while working on Firebase upload and download processing.            
-SDWebImage - Cashing images when image is downloaded.        
+SDWebImage - Caching images when image is downloaded.        
 
 If you want to try you can clone the project or simply download.    
 Don't forget to update pod files or install.
