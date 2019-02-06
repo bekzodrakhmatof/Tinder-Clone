@@ -7,8 +7,41 @@
 //
 
 import UIKit
+import Firebase
 
 class MatchView: UIView {
+    
+    var currentUser: User! {
+        didSet {
+            
+        }
+    }
+    
+    var cardUID: String! {
+        didSet {
+            
+            // Fetch card UID information
+            Firestore.firestore().collection("users").document(cardUID).getDocument { (snapshot, error) in
+                
+                if let error = error {
+                    print("Error Failed to fetch card user: \(error)")
+                    return
+                }
+                
+                guard let dictionary = snapshot?.data() else { return }
+                let user = User(dictionary: dictionary)
+                guard let url = URL(string: user.imageUrl1 ?? "") else { return }
+                self.cardUserImageView.sd_setImage(with: url)
+                
+                guard let currentUserImageUrl = URL(string: self.currentUser.imageUrl1 ?? "") else { return }
+                self.currentImageView.sd_setImage(with: currentUserImageUrl, completed: { (_, _, _, _) in
+                    self.setupAnimation()
+                })
+                
+                self.descriptionLabel.text = "You and \(user.name ?? "") have been liked each other."
+            }
+        }
+    }
     
     fileprivate let viusalEffectView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     
@@ -65,10 +98,11 @@ class MatchView: UIView {
         
         setupBlurView()
         setupLayout()
-        setupAnimation()
     }
     
     fileprivate func setupAnimation() {
+        
+        views.forEach({$0.alpha = 1})
         
         // Starting positions
         let angle = 30 * CGFloat.pi / 180
@@ -107,14 +141,22 @@ class MatchView: UIView {
         })
     }
     
+    lazy var views = [
+        
+        itsAMatchImageView,
+        descriptionLabel,
+        currentImageView,
+        cardUserImageView,
+        sendMessageButton,
+        keepSwipingButton
+    ]
+    
     fileprivate func setupLayout() {
         
-        addSubview(itsAMatchImageView)
-        addSubview(descriptionLabel)
-        addSubview(currentImageView)
-        addSubview(cardUserImageView)
-        addSubview(sendMessageButton)
-        addSubview(keepSwipingButton)
+        views.forEach { (view) in
+            addSubview(view)
+            view.alpha = 0
+        }
         
         let imageWith: CGFloat = 140
         
