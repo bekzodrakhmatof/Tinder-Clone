@@ -99,7 +99,8 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
         hud.textLabel.text = "Fetching Users"
         hud.show(in: view)
         
-        let query = Firestore.firestore().collection("users").whereField("age", isGreaterThan: minAge).whereField("age", isLessThan: maxAge)
+        let query = Firestore.firestore().collection("users").whereField("age", isGreaterThan: minAge - 1).whereField("age", isLessThan: maxAge + 1)
+//        let query = Firestore.firestore().collection("users")
         
         topCardView = nil
         

@@ -62,7 +62,7 @@ class MatchView: UIView {
     }()
     
     fileprivate let currentImageView: UIImageView = {
-        let imageView = UIImageView(image: #imageLiteral(resourceName: "kelly1"))
+        let imageView = UIImageView(image: #imageLiteral(resourceName: "photo_placeholder"))
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.layer.borderWidth = 2
@@ -71,7 +71,7 @@ class MatchView: UIView {
     }()
     
     fileprivate let cardUserImageView: UIImageView = {
-        let imageView = UIImageView(image: #imageLiteral(resourceName: "jane2"))
+        let imageView = UIImageView(image: #imageLiteral(resourceName: "photo_placeholder"))
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.layer.borderWidth = 2

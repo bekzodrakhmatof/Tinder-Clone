@@ -10,7 +10,7 @@ import UIKit
 
 class PhotoController: UIViewController {
 
-    let imageView = UIImageView(image: #imageLiteral(resourceName: "jane3"))
+    let imageView = UIImageView(image: #imageLiteral(resourceName: "photo_placeholder"))
     
     init(imageUrl: String) {
         
