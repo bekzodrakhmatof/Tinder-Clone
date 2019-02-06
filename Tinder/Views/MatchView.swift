@@ -65,6 +65,46 @@ class MatchView: UIView {
         
         setupBlurView()
         setupLayout()
+        setupAnimation()
+    }
+    
+    fileprivate func setupAnimation() {
+        
+        // Starting positions
+        let angle = 30 * CGFloat.pi / 180
+        
+        currentImageView.transform = CGAffineTransform(rotationAngle: -angle).concatenating(CGAffineTransform(translationX: 200, y: 0))
+        cardUserImageView.transform = CGAffineTransform(rotationAngle: angle).concatenating(CGAffineTransform(translationX: -200, y: 0))
+        
+        sendMessageButton.transform = CGAffineTransform(translationX: -500, y: 0)
+        keepSwipingButton.transform = CGAffineTransform(translationX: 500, y: 0)
+        
+        // Key Frame animation
+        UIView.animateKeyframes(withDuration: 1.3, delay: 0, options: .calculationModeCubic, animations: {
+            
+            //Animation translation back to original position
+            UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 0.5, animations: {
+                self.currentImageView.transform = CGAffineTransform(rotationAngle: angle)
+                self.cardUserImageView.transform = CGAffineTransform(rotationAngle: -angle)
+            })
+            
+            //Animation rotation
+            UIView.addKeyframe(withRelativeStartTime: 0.6, relativeDuration: 0.5, animations: {
+                
+                self.currentImageView.transform = .identity
+                self.cardUserImageView.transform = .identity
+                
+                
+            })
+            
+        }) { (_) in
+            
+        }
+        
+        UIView.animate(withDuration: 0.75, delay: 0.6 * 1.3, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.1, options: .curveEaseOut, animations: {
+            self.sendMessageButton.transform = .identity
+            self.keepSwipingButton.transform = .identity
+        })
     }
     
     fileprivate func setupLayout() {
@@ -103,7 +143,7 @@ class MatchView: UIView {
         viusalEffectView.fillSuperview()
         viusalEffectView.alpha = 0
         
-        UIView.animate(withDuration: 0.7, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
             self.viusalEffectView.alpha = 1
         }) { (_) in
             
@@ -112,7 +152,7 @@ class MatchView: UIView {
     
     @objc fileprivate func handleDismiss() {
         
-        UIView.animate(withDuration: 0.7, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
             self.alpha = 0
         }) { (_) in
             self.removeFromSuperview()

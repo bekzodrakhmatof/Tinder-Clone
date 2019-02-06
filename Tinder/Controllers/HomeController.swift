@@ -229,7 +229,7 @@ class HomeController: UIViewController, SettingsControllerDelegate, LoginControl
     
     fileprivate func performSwipeAnimation(translation: CGFloat, angle: CGFloat) {
         
-        let duration = 0.7
+        let duration = 0.5
         let translationAnimation = CABasicAnimation(keyPath: "position.x")
         translationAnimation.toValue = translation
         translationAnimation.duration = duration
