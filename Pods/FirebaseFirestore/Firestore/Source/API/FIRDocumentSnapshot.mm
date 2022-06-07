@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Google
+ * Copyright 2017 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,97 +14,97 @@
  * limitations under the License.
  */
 
-#import "FIRDocumentSnapshot.h"
+#import "FIRDocumentSnapshot+Internal.h"
 
 #include <utility>
+#include <vector>
 
-#import "FIRFirestoreSettings.h"
+#include "Firestore/core/src/util/warnings.h"
 
 #import "Firestore/Source/API/FIRDocumentReference+Internal.h"
 #import "Firestore/Source/API/FIRFieldPath+Internal.h"
 #import "Firestore/Source/API/FIRFirestore+Internal.h"
+#import "Firestore/Source/API/FIRGeoPoint+Internal.h"
 #import "Firestore/Source/API/FIRSnapshotMetadata+Internal.h"
-#import "Firestore/Source/Model/FSTDocument.h"
-#import "Firestore/Source/Model/FSTFieldValue.h"
-#import "Firestore/Source/Util/FSTUsageValidation.h"
+#import "Firestore/Source/API/FIRTimestamp+Internal.h"
+#import "Firestore/Source/API/FSTUserDataWriter.h"
+#import "Firestore/Source/API/converters.h"
 
-#include "Firestore/core/src/firebase/firestore/model/database_id.h"
-#include "Firestore/core/src/firebase/firestore/model/document_key.h"
-#include "Firestore/core/src/firebase/firestore/util/hard_assert.h"
-#include "Firestore/core/src/firebase/firestore/util/string_apple.h"
+#include "Firestore/Protos/nanopb/google/firestore/v1/document.nanopb.h"
+#include "Firestore/core/src/api/document_reference.h"
+#include "Firestore/core/src/api/document_snapshot.h"
+#include "Firestore/core/src/api/firestore.h"
+#include "Firestore/core/src/api/settings.h"
+#include "Firestore/core/src/model/database_id.h"
+#include "Firestore/core/src/model/document_key.h"
+#include "Firestore/core/src/model/field_path.h"
+#include "Firestore/core/src/nanopb/nanopb_util.h"
+#include "Firestore/core/src/remote/serializer.h"
+#include "Firestore/core/src/util/exception.h"
+#include "Firestore/core/src/util/hard_assert.h"
+#include "Firestore/core/src/util/log.h"
+#include "Firestore/core/src/util/string_apple.h"
 
-namespace util = firebase::firestore::util;
+using firebase::firestore::google_firestore_v1_Value;
+using firebase::firestore::api::DocumentSnapshot;
+using firebase::firestore::api::Firestore;
+using firebase::firestore::api::MakeFIRGeoPoint;
+using firebase::firestore::api::MakeFIRTimestamp;
+using firebase::firestore::api::SnapshotMetadata;
 using firebase::firestore::model::DatabaseId;
+using firebase::firestore::model::Document;
 using firebase::firestore::model::DocumentKey;
+using firebase::firestore::model::FieldPath;
+using firebase::firestore::model::ObjectValue;
+using firebase::firestore::remote::Serializer;
+using firebase::firestore::nanopb::MakeNSData;
+using firebase::firestore::util::MakeNSString;
+using firebase::firestore::util::MakeString;
+using firebase::firestore::util::ThrowInvalidArgument;
+using firebase::firestore::google_firestore_v1_Value;
 
 NS_ASSUME_NONNULL_BEGIN
 
-/** Converts a public FIRServerTimestampBehavior into its internal equivalent. */
-static FSTServerTimestampBehavior InternalServerTimestampBehavor(
-    FIRServerTimestampBehavior behavior) {
-  switch (behavior) {
-    case FIRServerTimestampBehaviorNone:
-      return FSTServerTimestampBehaviorNone;
-    case FIRServerTimestampBehaviorEstimate:
-      return FSTServerTimestampBehaviorEstimate;
-    case FIRServerTimestampBehaviorPrevious:
-      return FSTServerTimestampBehaviorPrevious;
-    default:
-      HARD_FAIL("Unexpected server timestamp option: %s", behavior);
-  }
-}
-
-@interface FIRDocumentSnapshot ()
-
-- (instancetype)initWithFirestore:(FIRFirestore *)firestore
-                      documentKey:(DocumentKey)documentKey
-                         document:(nullable FSTDocument *)document
-                        fromCache:(BOOL)fromCache NS_DESIGNATED_INITIALIZER;
-
-- (const DocumentKey &)internalKey;
-
-@property(nonatomic, strong, readonly) FIRFirestore *firestore;
-@property(nonatomic, strong, readonly, nullable) FSTDocument *internalDocument;
-@property(nonatomic, assign, readonly) BOOL fromCache;
-
-@end
-
-@implementation FIRDocumentSnapshot (Internal)
-
-+ (instancetype)snapshotWithFirestore:(FIRFirestore *)firestore
-                          documentKey:(DocumentKey)documentKey
-                             document:(nullable FSTDocument *)document
-                            fromCache:(BOOL)fromCache {
-  return [[[self class] alloc] initWithFirestore:firestore
-                                     documentKey:std::move(documentKey)
-                                        document:document
-                                       fromCache:fromCache];
-}
-
-@end
-
 @implementation FIRDocumentSnapshot {
+  DocumentSnapshot _snapshot;
+
+  std::unique_ptr<Serializer> _serializer;
   FIRSnapshotMetadata *_cachedMetadata;
-  DocumentKey _internalKey;
 }
 
-@dynamic metadata;
-
-- (instancetype)initWithFirestore:(FIRFirestore *)firestore
-                      documentKey:(DocumentKey)documentKey
-                         document:(nullable FSTDocument *)document
-                        fromCache:(BOOL)fromCache {
+- (instancetype)initWithSnapshot:(DocumentSnapshot &&)snapshot {
   if (self = [super init]) {
-    _firestore = firestore;
-    _internalKey = std::move(documentKey);
-    _internalDocument = document;
-    _fromCache = fromCache;
+    _snapshot = std::move(snapshot);
+    _serializer.reset(new Serializer(_snapshot.firestore()->database_id()));
   }
   return self;
 }
 
-- (const DocumentKey &)internalKey {
-  return _internalKey;
+- (instancetype)initWithFirestore:(FIRFirestore *)firestore
+                      documentKey:(DocumentKey)documentKey
+                         document:(const absl::optional<Document> &)document
+                         metadata:(SnapshotMetadata)metadata {
+  DocumentSnapshot wrapped;
+  if (document.has_value()) {
+    wrapped =
+        DocumentSnapshot::FromDocument(firestore.wrapped, document.value(), std::move(metadata));
+  } else {
+    wrapped = DocumentSnapshot::FromNoDocument(firestore.wrapped, std::move(documentKey),
+                                               std::move(metadata));
+  }
+  _serializer.reset(new Serializer(firestore.databaseID));
+  return [self initWithSnapshot:std::move(wrapped)];
+}
+
+- (instancetype)initWithFirestore:(FIRFirestore *)firestore
+                      documentKey:(DocumentKey)documentKey
+                         document:(const absl::optional<Document> &)document
+                        fromCache:(bool)fromCache
+                 hasPendingWrites:(bool)hasPendingWrites {
+  return [self initWithFirestore:firestore
+                     documentKey:std::move(documentKey)
+                        document:document
+                        metadata:SnapshotMetadata(hasPendingWrites, fromCache)];
 }
 
 // NSObject Methods
@@ -113,46 +113,36 @@ static FSTServerTimestampBehavior InternalServerTimestampBehavor(
   // self class could be FIRDocumentSnapshot or subtype. So we compare with base type explicitly.
   if (![other isKindOfClass:[FIRDocumentSnapshot class]]) return NO;
 
-  return [self isEqualToSnapshot:other];
-}
-
-- (BOOL)isEqualToSnapshot:(nullable FIRDocumentSnapshot *)snapshot {
-  if (self == snapshot) return YES;
-  if (snapshot == nil) return NO;
-
-  return [self.firestore isEqual:snapshot.firestore] && self.internalKey == snapshot.internalKey &&
-         (self.internalDocument == snapshot.internalDocument ||
-          [self.internalDocument isEqual:snapshot.internalDocument]) &&
-         self.fromCache == snapshot.fromCache;
+  return _snapshot == static_cast<FIRDocumentSnapshot *>(other)->_snapshot;
 }
 
 - (NSUInteger)hash {
-  NSUInteger hash = [self.firestore hash];
-  hash = hash * 31u + self.internalKey.Hash();
-  hash = hash * 31u + [self.internalDocument hash];
-  hash = hash * 31u + (self.fromCache ? 1 : 0);
-  return hash;
+  return _snapshot.Hash();
 }
 
 @dynamic exists;
 
 - (BOOL)exists {
-  return _internalDocument != nil;
+  return _snapshot.exists();
+}
+
+- (const absl::optional<Document> &)internalDocument {
+  return _snapshot.internal_document();
 }
 
 - (FIRDocumentReference *)reference {
-  return [FIRDocumentReference referenceWithKey:self.internalKey firestore:self.firestore];
+  return [[FIRDocumentReference alloc] initWithReference:_snapshot.CreateReference()];
 }
 
 - (NSString *)documentID {
-  return util::WrapNSString(self.internalKey.path().last_segment());
+  return MakeNSString(_snapshot.document_id());
 }
+
+@dynamic metadata;
 
 - (FIRSnapshotMetadata *)metadata {
   if (!_cachedMetadata) {
-    _cachedMetadata = [FIRSnapshotMetadata
-        snapshotMetadataWithPendingWrites:self.internalDocument.hasLocalMutations
-                                fromCache:self.fromCache];
+    _cachedMetadata = [[FIRSnapshotMetadata alloc] initWithMetadata:_snapshot.metadata()];
   }
   return _cachedMetadata;
 }
@@ -163,10 +153,13 @@ static FSTServerTimestampBehavior InternalServerTimestampBehavor(
 
 - (nullable NSDictionary<NSString *, id> *)dataWithServerTimestampBehavior:
     (FIRServerTimestampBehavior)serverTimestampBehavior {
-  FSTFieldValueOptions *options = [self optionsForServerTimestampBehavior:serverTimestampBehavior];
-  return self.internalDocument == nil
-             ? nil
-             : [self convertedObject:[self.internalDocument data] options:options];
+  absl::optional<google_firestore_v1_Value> data = _snapshot.GetValue(FieldPath::EmptyPath());
+  if (!data) return nil;
+
+  FSTUserDataWriter *dataWriter =
+      [[FSTUserDataWriter alloc] initWithFirestore:_snapshot.firestore()
+                           serverTimestampBehavior:serverTimestampBehavior];
+  return [dataWriter convertedValue:*data];
 }
 
 - (nullable id)valueForField:(id)field {
@@ -175,103 +168,29 @@ static FSTServerTimestampBehavior InternalServerTimestampBehavor(
 
 - (nullable id)valueForField:(id)field
      serverTimestampBehavior:(FIRServerTimestampBehavior)serverTimestampBehavior {
-  FIRFieldPath *fieldPath;
-
+  FieldPath fieldPath;
   if ([field isKindOfClass:[NSString class]]) {
-    fieldPath = [FIRFieldPath pathWithDotSeparatedString:field];
+    fieldPath = FieldPath::FromDotSeparatedString(MakeString(field));
   } else if ([field isKindOfClass:[FIRFieldPath class]]) {
-    fieldPath = field;
+    fieldPath = ((FIRFieldPath *)field).internalValue;
   } else {
-    FSTThrowInvalidArgument(@"Subscript key must be an NSString or FIRFieldPath.");
+    ThrowInvalidArgument("Subscript key must be an NSString or FIRFieldPath.");
   }
-
-  FSTFieldValue *fieldValue = [[self.internalDocument data] valueForPath:fieldPath.internalValue];
-  FSTFieldValueOptions *options = [self optionsForServerTimestampBehavior:serverTimestampBehavior];
-  return fieldValue == nil ? nil : [self convertedValue:fieldValue options:options];
-}
-
-- (FSTFieldValueOptions *)optionsForServerTimestampBehavior:
-    (FIRServerTimestampBehavior)serverTimestampBehavior {
-  FSTServerTimestampBehavior internalBehavior =
-      InternalServerTimestampBehavor(serverTimestampBehavior);
-  return [[FSTFieldValueOptions alloc]
-      initWithServerTimestampBehavior:internalBehavior
-         timestampsInSnapshotsEnabled:self.firestore.settings.timestampsInSnapshotsEnabled];
+  absl::optional<google_firestore_v1_Value> fieldValue = _snapshot.GetValue(fieldPath);
+  if (!fieldValue) return nil;
+  FSTUserDataWriter *dataWriter =
+      [[FSTUserDataWriter alloc] initWithFirestore:_snapshot.firestore()
+                           serverTimestampBehavior:serverTimestampBehavior];
+  return [dataWriter convertedValue:*fieldValue];
 }
 
 - (nullable id)objectForKeyedSubscript:(id)key {
   return [self valueForField:key];
 }
 
-- (id)convertedValue:(FSTFieldValue *)value options:(FSTFieldValueOptions *)options {
-  if ([value isKindOfClass:[FSTObjectValue class]]) {
-    return [self convertedObject:(FSTObjectValue *)value options:options];
-  } else if ([value isKindOfClass:[FSTArrayValue class]]) {
-    return [self convertedArray:(FSTArrayValue *)value options:options];
-  } else if ([value isKindOfClass:[FSTReferenceValue class]]) {
-    FSTReferenceValue *ref = (FSTReferenceValue *)value;
-    const DatabaseId *refDatabase = ref.databaseID;
-    const DatabaseId *database = self.firestore.databaseID;
-    if (*refDatabase != *database) {
-      // TODO(b/32073923): Log this as a proper warning.
-      NSLog(
-          @"WARNING: Document %@ contains a document reference within a different database "
-           "(%s/%s) which is not supported. It will be treated as a reference within the "
-           "current database (%s/%s) instead.",
-          self.reference.path, refDatabase->project_id().c_str(),
-          refDatabase->database_id().c_str(), database->project_id().c_str(),
-          database->database_id().c_str());
-    }
-    return [FIRDocumentReference referenceWithKey:[ref valueWithOptions:options]
-                                        firestore:self.firestore];
-  } else {
-    return [value valueWithOptions:options];
-  }
-}
-
-- (NSDictionary<NSString *, id> *)convertedObject:(FSTObjectValue *)objectValue
-                                          options:(FSTFieldValueOptions *)options {
-  NSMutableDictionary *result = [NSMutableDictionary dictionary];
-  [objectValue.internalValue
-      enumerateKeysAndObjectsUsingBlock:^(NSString *key, FSTFieldValue *value, BOOL *stop) {
-        result[key] = [self convertedValue:value options:options];
-      }];
-  return result;
-}
-
-- (NSArray<id> *)convertedArray:(FSTArrayValue *)arrayValue
-                        options:(FSTFieldValueOptions *)options {
-  NSArray<FSTFieldValue *> *internalValue = arrayValue.internalValue;
-  NSMutableArray *result = [NSMutableArray arrayWithCapacity:internalValue.count];
-  [internalValue enumerateObjectsUsingBlock:^(id value, NSUInteger idx, BOOL *stop) {
-    [result addObject:[self convertedValue:value options:options]];
-  }];
-  return result;
-}
-
-@end
-
-@interface FIRQueryDocumentSnapshot ()
-
-- (instancetype)initWithFirestore:(FIRFirestore *)firestore
-                      documentKey:(DocumentKey)documentKey
-                         document:(FSTDocument *)document
-                        fromCache:(BOOL)fromCache NS_DESIGNATED_INITIALIZER;
-
 @end
 
 @implementation FIRQueryDocumentSnapshot
-
-- (instancetype)initWithFirestore:(FIRFirestore *)firestore
-                      documentKey:(DocumentKey)documentKey
-                         document:(FSTDocument *)document
-                        fromCache:(BOOL)fromCache {
-  self = [super initWithFirestore:firestore
-                      documentKey:std::move(documentKey)
-                         document:document
-                        fromCache:fromCache];
-  return self;
-}
 
 - (NSDictionary<NSString *, id> *)data {
   NSDictionary<NSString *, id> *data = [super data];

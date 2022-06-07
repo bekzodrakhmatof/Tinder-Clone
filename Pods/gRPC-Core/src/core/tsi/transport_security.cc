@@ -67,6 +67,19 @@ const char* tsi_result_to_string(tsi_result result) {
   }
 }
 
+const char* tsi_security_level_to_string(tsi_security_level security_level) {
+  switch (security_level) {
+    case TSI_SECURITY_NONE:
+      return "TSI_SECURITY_NONE";
+    case TSI_INTEGRITY_ONLY:
+      return "TSI_INTEGRITY_ONLY";
+    case TSI_PRIVACY_AND_INTEGRITY:
+      return "TSI_PRIVACY_AND_INTEGRITY";
+    default:
+      return "UNKNOWN";
+  }
+}
+
 /* --- tsi_frame_protector common implementation. ---
 
    Calls specific implementation after state/input validation. */
@@ -213,10 +226,10 @@ tsi_result tsi_handshaker_next(
 
 void tsi_handshaker_shutdown(tsi_handshaker* self) {
   if (self == nullptr || self->vtable == nullptr) return;
-  self->handshake_shutdown = true;
   if (self->vtable->shutdown != nullptr) {
     self->vtable->shutdown(self);
   }
+  self->handshake_shutdown = true;
 }
 
 void tsi_handshaker_destroy(tsi_handshaker* self) {
@@ -337,4 +350,21 @@ tsi_result tsi_construct_peer(size_t property_count, tsi_peer* peer) {
     peer->property_count = property_count;
   }
   return TSI_OK;
+}
+
+const tsi_peer_property* tsi_peer_get_property_by_name(const tsi_peer* peer,
+                                                       const char* name) {
+  size_t i;
+  if (peer == nullptr) return nullptr;
+  for (i = 0; i < peer->property_count; i++) {
+    const tsi_peer_property* property = &peer->properties[i];
+    if (name == nullptr && property->name == nullptr) {
+      return property;
+    }
+    if (name != nullptr && property->name != nullptr &&
+        strcmp(property->name, name) == 0) {
+      return property;
+    }
+  }
+  return nullptr;
 }

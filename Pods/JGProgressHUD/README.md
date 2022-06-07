@@ -1,7 +1,7 @@
 JGProgressHUD
 ---------------
 
-An elegant and simple progress HUD for iOS and tvOS.<br/>
+An elegant and simple progress HUD for iOS and tvOS. **Supports Swift and Objective-C!**<br/>
 <p align="center">
 <img src="Examples/Screenshots/Presentation.png" style='height: 100%; width: 100%; object-fit: contain'/>
 </p>
@@ -16,18 +16,22 @@ __The ultimate progress HUD for iOS and tvOS is here: JGProgressHUD!__
 - Uses `UIVisualEffectView` and `UIMotionEffect` for a native look.
 - Uses AutoLayout to provide a fully dynamic layout.
 - Detects and repositions when keyboard appears/disappears.
+- Dark mode support — automatically changes appearance.
 - Well documented and maintained.
 - Voice Over/`UIAccessibility` support.
 - Backward compatibility to iOS 8.
-- Can be used with Swift and Objective C.
+- Can be used with Swift and Objective-C.
 - And most importantly, it looks good!
 
 Download the source code and open the <a href="Examples">Examples</a> project to try JGProgressHUD and see all of its features in action!
 
-[![GitHub release](https://img.shields.io/github/release/JonasGessner/JGProgressHUD.svg)](https://github.com/JonasGessner/JGProgressHUD/releases)
+JGProgressHUD can also be used with SwiftUI. See [JGProgressHUD-SwiftUI](https://github.com/JonasGessner/JGProgressHUD-SwiftUI).
+
 [![GitHub license](https://img.shields.io/github/license/JonasGessner/JGProgressHUD.svg)](https://github.com/JonasGessner/JGProgressHUD/blob/master/LICENSE.txt)
 [![CocoaPods](https://img.shields.io/cocoapods/v/JGProgressHUD.svg)](https://cocoapods.org/pods/JGProgressHUD)
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
+[![Carthage compatible](https://img.shields.io/badge/SwiftPM-Compatible-brightgreen)](https://swift.org/package-manager)
+
 
 Examples
 --------------
@@ -40,10 +44,10 @@ Examples
 
 #### Showing indeterminate progress:
 
-Objective C:
+Objective-C:
 
 ```objc
-JGProgressHUD *HUD = [JGProgressHUD progressHUDWithStyle:JGProgressHUDStyleDark];
+JGProgressHUD *HUD = [[JGProgressHUD alloc] init];
 HUD.textLabel.text = @"Loading";
 [HUD showInView:self.view];
 [HUD dismissAfterDelay:3.0];
@@ -52,7 +56,7 @@ HUD.textLabel.text = @"Loading";
 Swift:
 
 ```swift
-let hud = JGProgressHUD(style: .dark)
+let hud = JGProgressHUD()
 hud.textLabel.text = "Loading"
 hud.show(in: self.view)
 hud.dismiss(afterDelay: 3.0)
@@ -63,7 +67,7 @@ This displays a dark HUD with an activity indicator and the title "Loading". The
 #### Showing an error message:
 
 ```objc
-JGProgressHUD *HUD = [JGProgressHUD progressHUDWithStyle:JGProgressHUDStyleDark];
+JGProgressHUD *HUD = [[JGProgressHUD alloc] init];
 HUD.textLabel.text = @"Error";
 HUD.indicatorView = [[JGProgressHUDErrorIndicatorView alloc] init]; //JGProgressHUDSuccessIndicatorView is also available
 [HUD showInView:self.view];
@@ -73,16 +77,16 @@ HUD.indicatorView = [[JGProgressHUDErrorIndicatorView alloc] init]; //JGProgress
 #### Showing determinate progress:
 
 ```objc
-JGProgressHUD *HUD = [JGProgressHUD progressHUDWithStyle:JGProgressHUDStyleDark];
+JGProgressHUD *HUD = [[JGProgressHUD alloc] init];
 HUD.indicatorView = [[JGProgressHUDPieIndicatorView alloc] init]; //Or JGProgressHUDRingIndicatorView
 HUD.progress = 0.5f;
 [HUD showInView:self.view];
 [HUD dismissAfterDelay:3.0];
 ```
 
-__Important:__ You should always show `JGProgressHUD` in a `UIViewController` view.
+__For more examples, including in Swift, see <a href="Examples">Examples</a>.__
 
-Download the source code and open the <a href="Examples">Examples</a> project to explore more use cases for JGProgressHUD.
+__Important:__ You should always show `JGProgressHUD` in a `UIViewController` view.
 
 Customization
 -----------
@@ -92,6 +96,8 @@ JGProgressHUD can be displayed in 3 styles:
 - __Extra Light__
 - __Light__
 - __Dark__
+
+The style can also be set automatically according to the current `UITraitCollection` (dark mode). Use the initializer `[[JGProgressHUD alloc] init]`/`JGProgressHUD()` to take advantage of the automatic style.
 
 ### Indicator Views:
 By default a HUD will display an indeterminate progress indicator. The indicator view can be completely hidden by setting the `indicatorView` property to `nil`. These indicator views are available by default:
@@ -118,12 +124,12 @@ To dim the content behind the HUD set your dim color as `backgroundColor` of you
 
 Installation
 --------------
-### CocoaPods:
-In your `Podfile` add:
 
-```
-pod 'JGProgressHUD'
-```
+### Swift Package Manager:
+
+In Xcode, use the menu File > Swift Packages > Add Package Dependency... and enter the package URL `https://github.com/JonasGessner/JGProgressHUD.git`.
+
+This is the recommended way of installing JGProgressHUD.
 
 ### Carthage:
 In your `Cartfile` add:
@@ -132,12 +138,20 @@ In your `Cartfile` add:
 github "JonasGessner/JGProgressHUD"
 ```
 
-### Manual Installation (Framework):
+### CocoaPods:
+In your `Podfile` add:
+
+```
+pod 'JGProgressHUD'
+```
+
+### Manual Installation:
 
 1. Drag the `JGProgressHUD.xcodeproj` file into your Xcode project.
 2. Add `JGProgressHUD.framework` to "Embedded Binaries" in the "General" tab of your target.
 
-Then import the module where you want to use it:
+-------
+After installing import the module where you want to use it:
 
 ```objc
 @import JGProgressHUD;
@@ -154,21 +168,21 @@ See the <a href="Examples">Examples</a> project for an example implementation of
 Requirements
 ------------
 
-- Base SDK of iOS/tvOS 11.0 or higher.
-- Deployment target of iOS 8.0, tvOS 9.0 or higher.
+- Base SDK of iOS/tvOS/macCatalyst 13.0 or higher.
+- Deployment target of iOS 8.0, tvOS 9.0, macCatalyst 13.0, or higher.
 
 JGProgressHUD can also be used by projects written in Swift. See <a href="https://github.com/JonasGessner/JGProgressHUD#installation">Installation</a> for details.
 
 Documentation
 ----------------
 Detailed documentation can be found on <a href="http://jonasgessner.github.io/JGProgressHUD/">here</a>.<br/><br/>
-Each class and method is well documented, making it easy to quickly get a good overview. To start, see <a href="JGProgressHUD/JGProgressHUD/JGProgressHUD.h">JGProgressHUD.h</a>.
+Each class and method is well documented, making it easy to quickly get a good overview. To start, see <a href="JGProgressHUD/JGProgressHUD/include/JGProgressHUD.h">JGProgressHUD.h</a>.
 
 License
 ---------
 MIT License.<br/>
-© 2014-2018, Jonas Gessner.
+© 2014-2020, Jonas Gessner.
 
 Credits
 ----------
-Created and maintained by Jonas Gessner, © 2014-2018.<br/>
+Created and maintained by Jonas Gessner, © 2014-2020.<br/>

@@ -22,14 +22,16 @@
 #include <vector>
 
 #import "Firestore/Source/API/FIRFieldPath+Internal.h"
-#import "Firestore/Source/Util/FSTUsageValidation.h"
 
-#include "Firestore/core/src/firebase/firestore/model/field_path.h"
-#include "Firestore/core/src/firebase/firestore/util/hashing.h"
-#include "Firestore/core/src/firebase/firestore/util/string_apple.h"
+#include "Firestore/core/src/model/field_path.h"
+#include "Firestore/core/src/util/exception.h"
+#include "Firestore/core/src/util/hashing.h"
+#include "Firestore/core/src/util/string_apple.h"
 
-namespace util = firebase::firestore::util;
 using firebase::firestore::model::FieldPath;
+using firebase::firestore::util::Hash;
+using firebase::firestore::util::MakeString;
+using firebase::firestore::util::ThrowInvalidArgument;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -44,19 +46,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithFields:(NSArray<NSString *> *)fieldNames {
   if (fieldNames.count == 0) {
-    FSTThrowInvalidArgument(@"Invalid field path. Provided names must not be empty.");
+    ThrowInvalidArgument("Invalid field path. Provided names must not be empty.");
   }
 
-  std::vector<std::string> field_names;
-  field_names.reserve(fieldNames.count);
-  for (int i = 0; i < fieldNames.count; ++i) {
-    if (fieldNames[i].length == 0) {
-      FSTThrowInvalidArgument(@"Invalid field name at index %d. Field names must not be empty.", i);
-    }
-    field_names.emplace_back(util::MakeString(fieldNames[i]));
+  std::vector<std::string> converted;
+  converted.reserve(fieldNames.count);
+  for (NSString *fieldName in fieldNames) {
+    converted.emplace_back(MakeString(fieldName));
   }
 
-  return [self initPrivate:FieldPath(std::move(field_names))];
+  return [self initPrivate:FieldPath::FromSegments(std::move(converted))];
 }
 
 + (instancetype)documentID {
@@ -71,34 +70,10 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 + (instancetype)pathWithDotSeparatedString:(NSString *)path {
-  if ([[FIRFieldPath reservedCharactersRegex]
-          numberOfMatchesInString:path
-                          options:0
-                            range:NSMakeRange(0, path.length)] > 0) {
-    FSTThrowInvalidArgument(
-        @"Invalid field path (%@). Paths must not contain '~', '*', '/', '[', or ']'", path);
-  }
-  @try {
-    return [[FIRFieldPath alloc] initWithFields:[path componentsSeparatedByString:@"."]];
-  } @catch (NSException *exception) {
-    FSTThrowInvalidArgument(
-        @"Invalid field path (%@). Paths must not be empty, begin with '.', end with '.', or "
-        @"contain '..'",
-        path);
-  }
+  return [[FIRFieldPath alloc] initPrivate:FieldPath::FromDotSeparatedString(MakeString(path))];
 }
 
-/** Matches any characters in a field path string that are reserved. */
-+ (NSRegularExpression *)reservedCharactersRegex {
-  static NSRegularExpression *regex = nil;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    regex = [NSRegularExpression regularExpressionWithPattern:@"[~*/\\[\\]]" options:0 error:nil];
-  });
-  return regex;
-}
-
-- (id)copyWithZone:(NSZone *__nullable)zone {
+- (id)copyWithZone:(__unused NSZone *_Nullable)zone {
   return [[[self class] alloc] initPrivate:_internalValue];
 }
 
@@ -115,7 +90,7 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (NSUInteger)hash {
-  return util::Hash(_internalValue);
+  return Hash(_internalValue);
 }
 
 - (const firebase::firestore::model::FieldPath &)internalValue {

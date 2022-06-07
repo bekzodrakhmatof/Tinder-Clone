@@ -26,14 +26,24 @@
 #include <grpc/support/sync.h>
 #include <grpc/support/time.h>
 
-#include "src/core/lib/gpr/env.h"
 #include "src/core/lib/gpr/useful.h"
+#include "src/core/lib/gprpp/global_config.h"
 #include "src/core/lib/gprpp/memory.h"
 
 /*
  * NOTE: FORKING IS NOT GENERALLY SUPPORTED, THIS IS ONLY INTENDED TO WORK
  *       AROUND VERY SPECIFIC USE CASES.
  */
+
+#ifdef GRPC_ENABLE_FORK_SUPPORT
+#define GRPC_ENABLE_FORK_SUPPORT_DEFAULT true
+#else
+#define GRPC_ENABLE_FORK_SUPPORT_DEFAULT false
+#endif  // GRPC_ENABLE_FORK_SUPPORT
+
+GPR_GLOBAL_CONFIG_DEFINE_BOOL(grpc_enable_fork_support,
+                              GRPC_ENABLE_FORK_SUPPORT_DEFAULT,
+                              "Enable folk support");
 
 namespace grpc_core {
 namespace internal {
@@ -157,104 +167,76 @@ class ThreadState {
 }  // namespace
 
 void Fork::GlobalInit() {
-  if (!overrideEnabled_) {
-#ifdef GRPC_ENABLE_FORK_SUPPORT
-    supportEnabled_ = true;
-#else
-    supportEnabled_ = false;
-#endif
-    bool env_var_set = false;
-    char* env = gpr_getenv("GRPC_ENABLE_FORK_SUPPORT");
-    if (env != nullptr) {
-      static const char* truthy[] = {"yes",  "Yes",  "YES", "true",
-                                     "True", "TRUE", "1"};
-      static const char* falsey[] = {"no",    "No",    "NO", "false",
-                                     "False", "FALSE", "0"};
-      for (size_t i = 0; i < GPR_ARRAY_SIZE(truthy); i++) {
-        if (0 == strcmp(env, truthy[i])) {
-          supportEnabled_ = true;
-          env_var_set = true;
-          break;
-        }
-      }
-      if (!env_var_set) {
-        for (size_t i = 0; i < GPR_ARRAY_SIZE(falsey); i++) {
-          if (0 == strcmp(env, falsey[i])) {
-            supportEnabled_ = false;
-            env_var_set = true;
-            break;
-          }
-        }
-      }
-      gpr_free(env);
-    }
+  if (!override_enabled_) {
+    support_enabled_.Store(GPR_GLOBAL_CONFIG_GET(grpc_enable_fork_support),
+                           MemoryOrder::RELAXED);
   }
-  if (supportEnabled_) {
-    execCtxState_ = grpc_core::New<internal::ExecCtxState>();
-    threadState_ = grpc_core::New<internal::ThreadState>();
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    exec_ctx_state_ = new internal::ExecCtxState();
+    thread_state_ = new internal::ThreadState();
   }
 }
 
 void Fork::GlobalShutdown() {
-  if (supportEnabled_) {
-    grpc_core::Delete(execCtxState_);
-    grpc_core::Delete(threadState_);
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    delete exec_ctx_state_;
+    delete thread_state_;
   }
 }
 
-bool Fork::Enabled() { return supportEnabled_; }
+bool Fork::Enabled() { return support_enabled_.Load(MemoryOrder::RELAXED); }
 
 // Testing Only
 void Fork::Enable(bool enable) {
-  overrideEnabled_ = true;
-  supportEnabled_ = enable;
+  override_enabled_ = true;
+  support_enabled_.Store(enable, MemoryOrder::RELAXED);
 }
 
-void Fork::IncExecCtxCount() {
-  if (supportEnabled_) {
-    execCtxState_->IncExecCtxCount();
-  }
-}
+void Fork::DoIncExecCtxCount() { exec_ctx_state_->IncExecCtxCount(); }
 
-void Fork::DecExecCtxCount() {
-  if (supportEnabled_) {
-    execCtxState_->DecExecCtxCount();
-  }
+void Fork::DoDecExecCtxCount() { exec_ctx_state_->DecExecCtxCount(); }
+
+void Fork::SetResetChildPollingEngineFunc(
+    Fork::child_postfork_func reset_child_polling_engine) {
+  reset_child_polling_engine_ = reset_child_polling_engine;
+}
+Fork::child_postfork_func Fork::GetResetChildPollingEngineFunc() {
+  return reset_child_polling_engine_;
 }
 
 bool Fork::BlockExecCtx() {
-  if (supportEnabled_) {
-    return execCtxState_->BlockExecCtx();
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    return exec_ctx_state_->BlockExecCtx();
   }
   return false;
 }
 
 void Fork::AllowExecCtx() {
-  if (supportEnabled_) {
-    execCtxState_->AllowExecCtx();
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    exec_ctx_state_->AllowExecCtx();
   }
 }
 
 void Fork::IncThreadCount() {
-  if (supportEnabled_) {
-    threadState_->IncThreadCount();
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    thread_state_->IncThreadCount();
   }
 }
 
 void Fork::DecThreadCount() {
-  if (supportEnabled_) {
-    threadState_->DecThreadCount();
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    thread_state_->DecThreadCount();
   }
 }
 void Fork::AwaitThreads() {
-  if (supportEnabled_) {
-    threadState_->AwaitThreads();
+  if (support_enabled_.Load(MemoryOrder::RELAXED)) {
+    thread_state_->AwaitThreads();
   }
 }
 
-internal::ExecCtxState* Fork::execCtxState_ = nullptr;
-internal::ThreadState* Fork::threadState_ = nullptr;
-bool Fork::supportEnabled_ = false;
-bool Fork::overrideEnabled_ = false;
-
+internal::ExecCtxState* Fork::exec_ctx_state_ = nullptr;
+internal::ThreadState* Fork::thread_state_ = nullptr;
+Atomic<bool> Fork::support_enabled_(false);
+bool Fork::override_enabled_ = false;
+Fork::child_postfork_func Fork::reset_child_polling_engine_ = nullptr;
 }  // namespace grpc_core

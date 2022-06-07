@@ -16,21 +16,28 @@
 
 #import "FIRQuerySnapshot.h"
 
+#include <memory>
+
+#include "Firestore/core/src/api/api_fwd.h"
+#include "Firestore/core/src/core/core_fwd.h"
+
 @class FIRFirestore;
 @class FIRSnapshotMetadata;
-@class FSTDocumentSet;
-@class FSTQuery;
-@class FSTViewSnapshot;
+
+namespace api = firebase::firestore::api;
+namespace core = firebase::firestore::core;
 
 NS_ASSUME_NONNULL_BEGIN
 
 /** Internal FIRQuerySnapshot API we don't want exposed in our public header files. */
-@interface FIRQuerySnapshot (Internal)
+@interface FIRQuerySnapshot (/* Init */)
 
-+ (instancetype)snapshotWithFirestore:(FIRFirestore *)firestore
-                        originalQuery:(FSTQuery *)query
-                             snapshot:(FSTViewSnapshot *)snapshot
-                             metadata:(FIRSnapshotMetadata *)metadata;
+- (instancetype)initWithSnapshot:(api::QuerySnapshot &&)snapshot NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)initWithFirestore:(std::shared_ptr<api::Firestore>)firestore
+                    originalQuery:(core::Query)query
+                         snapshot:(core::ViewSnapshot &&)snapshot
+                         metadata:(api::SnapshotMetadata)metadata;
 
 @end
 

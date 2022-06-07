@@ -21,46 +21,55 @@
 
 #include <grpc/support/port_platform.h>
 
+#include <string>
+
 #include "src/core/lib/channel/channel_args.h"
 #include "src/core/lib/channel/channel_stack.h"
+#include "src/core/lib/channel/channel_trace.h"
 #include "src/core/lib/channel/channelz.h"
-#include "src/core/lib/gprpp/inlined_vector.h"
 
 namespace grpc_core {
 
-// TODO(ncteisen), this only contains the uuids of the children for now,
-// since that is all that is strictly needed. In a future enhancement we will
-// add human readable names as in the channelz.proto
-typedef InlinedVector<intptr_t, 10> ChildRefsList;
+class Subchannel;
 
 namespace channelz {
 
-// Subtype of ChannelNode that overrides and provides client_channel specific
-// functionality like querying for connectivity_state and subchannel data.
-class ClientChannelNode : public ChannelNode {
+class SubchannelNode : public BaseNode {
  public:
-  static RefCountedPtr<ChannelNode> MakeClientChannelNode(
-      grpc_channel* channel, size_t channel_tracer_max_nodes);
+  SubchannelNode(std::string target_address, size_t channel_tracer_max_nodes);
+  ~SubchannelNode() override;
 
-  // Override this functionality since client_channels have a notion of
-  // channel connectivity.
-  void PopulateConnectivityState(grpc_json* json) override;
+  // Sets the subchannel's connectivity state without health checking.
+  void UpdateConnectivityState(grpc_connectivity_state state);
 
-  // Override this functionality since client_channels have subchannels
-  void PopulateChildRefs(grpc_json* json) override;
+  // Used when the subchannel's child socket changes. This should be set when
+  // the subchannel's transport is created and set to nullptr when the
+  // subchannel unrefs the transport.
+  void SetChildSocket(RefCountedPtr<SocketNode> socket);
 
-  // Helper to create a channel arg to ensure this type of ChannelNode is
-  // created.
-  static grpc_arg CreateChannelArg();
+  Json RenderJson() override;
 
- protected:
-  GPRC_ALLOW_CLASS_TO_USE_NON_PUBLIC_DELETE
-  GPRC_ALLOW_CLASS_TO_USE_NON_PUBLIC_NEW
-  ClientChannelNode(grpc_channel* channel, size_t channel_tracer_max_nodes);
-  virtual ~ClientChannelNode() {}
+  // proxy methods to composed classes.
+  void AddTraceEvent(ChannelTrace::Severity severity, const grpc_slice& data) {
+    trace_.AddTraceEvent(severity, data);
+  }
+  void AddTraceEventWithReference(ChannelTrace::Severity severity,
+                                  const grpc_slice& data,
+                                  RefCountedPtr<BaseNode> referenced_channel) {
+    trace_.AddTraceEventWithReference(severity, data,
+                                      std::move(referenced_channel));
+  }
+  void RecordCallStarted() { call_counter_.RecordCallStarted(); }
+  void RecordCallFailed() { call_counter_.RecordCallFailed(); }
+  void RecordCallSucceeded() { call_counter_.RecordCallSucceeded(); }
 
  private:
-  grpc_channel_element* client_channel_;
+  Atomic<grpc_connectivity_state> connectivity_state_{GRPC_CHANNEL_IDLE};
+  Mutex socket_mu_;
+  RefCountedPtr<SocketNode> child_socket_;
+  std::string target_;
+  CallCountingHelper call_counter_;
+  ChannelTrace trace_;
 };
 
 }  // namespace channelz

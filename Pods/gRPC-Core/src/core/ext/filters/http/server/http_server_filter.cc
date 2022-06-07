@@ -23,6 +23,7 @@
 #include <grpc/support/alloc.h>
 #include <grpc/support/log.h>
 #include <string.h>
+#include "src/core/lib/channel/channel_args.h"
 #include "src/core/lib/gprpp/manual_constructor.h"
 #include "src/core/lib/profiling/timers.h"
 #include "src/core/lib/slice/b64.h"
@@ -34,10 +35,33 @@
 #define EXPECTED_CONTENT_TYPE "application/grpc"
 #define EXPECTED_CONTENT_TYPE_LENGTH sizeof(EXPECTED_CONTENT_TYPE) - 1
 
+static void hs_recv_initial_metadata_ready(void* user_data, grpc_error* err);
+static void hs_recv_trailing_metadata_ready(void* user_data, grpc_error* err);
+static void hs_recv_message_ready(void* user_data, grpc_error* err);
+
 namespace {
 
 struct call_data {
-  grpc_call_combiner* call_combiner;
+  call_data(grpc_call_element* elem, const grpc_call_element_args& args)
+      : call_combiner(args.call_combiner) {
+    GRPC_CLOSURE_INIT(&recv_initial_metadata_ready,
+                      hs_recv_initial_metadata_ready, elem,
+                      grpc_schedule_on_exec_ctx);
+    GRPC_CLOSURE_INIT(&recv_message_ready, hs_recv_message_ready, elem,
+                      grpc_schedule_on_exec_ctx);
+    GRPC_CLOSURE_INIT(&recv_trailing_metadata_ready,
+                      hs_recv_trailing_metadata_ready, elem,
+                      grpc_schedule_on_exec_ctx);
+  }
+
+  ~call_data() {
+    GRPC_ERROR_UNREF(recv_initial_metadata_ready_error);
+    if (have_read_stream) {
+      read_stream->Orphan();
+    }
+  }
+
+  grpc_core::CallCombiner* call_combiner;
 
   // Outgoing headers to add to send_initial_metadata.
   grpc_linked_mdelem status;
@@ -46,26 +70,36 @@ struct call_data {
   // If we see the recv_message contents in the GET query string, we
   // store it here.
   grpc_core::ManualConstructor<grpc_core::SliceBufferByteStream> read_stream;
-  bool have_read_stream;
+  bool have_read_stream = false;
 
   // State for intercepting recv_initial_metadata.
   grpc_closure recv_initial_metadata_ready;
+  grpc_error* recv_initial_metadata_ready_error = GRPC_ERROR_NONE;
   grpc_closure* original_recv_initial_metadata_ready;
-  grpc_metadata_batch* recv_initial_metadata;
+  grpc_metadata_batch* recv_initial_metadata = nullptr;
   uint32_t* recv_initial_metadata_flags;
-  bool seen_recv_initial_metadata_ready;
+  bool seen_recv_initial_metadata_ready = false;
 
   // State for intercepting recv_message.
   grpc_closure* original_recv_message_ready;
   grpc_closure recv_message_ready;
   grpc_core::OrphanablePtr<grpc_core::ByteStream>* recv_message;
-  bool seen_recv_message_ready;
+  bool seen_recv_message_ready = false;
+
+  // State for intercepting recv_trailing_metadata
+  grpc_closure recv_trailing_metadata_ready;
+  grpc_closure* original_recv_trailing_metadata_ready;
+  grpc_error* recv_trailing_metadata_ready_error;
+  bool seen_recv_trailing_metadata_ready = false;
+};
+
+struct channel_data {
+  bool surface_user_agent;
 };
 
 }  // namespace
 
-static grpc_error* hs_filter_outgoing_metadata(grpc_call_element* elem,
-                                               grpc_metadata_batch* b) {
+static grpc_error* hs_filter_outgoing_metadata(grpc_metadata_batch* b) {
   if (b->idx.named.grpc_message != nullptr) {
     grpc_slice pct_encoded_msg = grpc_percent_encode_slice(
         GRPC_MDVALUE(b->idx.named.grpc_message->md),
@@ -89,6 +123,32 @@ static void hs_add_error(const char* error_name, grpc_error** cumulative,
   *cumulative = grpc_error_add_child(*cumulative, new_err);
 }
 
+// Metadata equality within this filter leverages the fact that the sender was
+// likely using the gRPC chttp2 transport, in which case the encoder would emit
+// indexed values, in which case the local hpack parser would intern the
+// relevant metadata, allowing a simple pointer comparison.
+//
+// That said, if the header was transmitted sans indexing/encoding, we still
+// need to do the right thing.
+//
+// Assumptions:
+// 1) The keys for a and b_static must match
+// 2) b_static must be a statically allocated metadata object.
+// 3) It is assumed that the remote end is indexing, but not necessary.
+// TODO(arjunroy): Revisit this method when grpc_mdelem is strongly typed.
+static bool md_strict_equal(grpc_mdelem a, grpc_mdelem b_static) {
+  // Hpack encoder on the remote side should emit indexed values, in which case
+  // hpack parser on this end should pick up interned values, in which case the
+  // pointer comparison alone is enough.
+  //
+  if (GPR_LIKELY(GRPC_MDELEM_IS_INTERNED(a))) {
+    return a.payload == b_static.payload;
+  } else {
+    return grpc_slice_eq_static_interned(GRPC_MDVALUE(a),
+                                         GRPC_MDVALUE(b_static));
+  }
+}
+
 static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
                                                grpc_metadata_batch* b) {
   call_data* calld = static_cast<call_data*>(elem->call_data);
@@ -96,18 +156,18 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
   static const char* error_name = "Failed processing incoming headers";
 
   if (b->idx.named.method != nullptr) {
-    if (grpc_mdelem_eq(b->idx.named.method->md, GRPC_MDELEM_METHOD_POST)) {
+    if (md_strict_equal(b->idx.named.method->md, GRPC_MDELEM_METHOD_POST)) {
       *calld->recv_initial_metadata_flags &=
           ~(GRPC_INITIAL_METADATA_CACHEABLE_REQUEST |
             GRPC_INITIAL_METADATA_IDEMPOTENT_REQUEST);
-    } else if (grpc_mdelem_eq(b->idx.named.method->md,
-                              GRPC_MDELEM_METHOD_PUT)) {
+    } else if (md_strict_equal(b->idx.named.method->md,
+                               GRPC_MDELEM_METHOD_PUT)) {
       *calld->recv_initial_metadata_flags &=
           ~GRPC_INITIAL_METADATA_CACHEABLE_REQUEST;
       *calld->recv_initial_metadata_flags |=
           GRPC_INITIAL_METADATA_IDEMPOTENT_REQUEST;
-    } else if (grpc_mdelem_eq(b->idx.named.method->md,
-                              GRPC_MDELEM_METHOD_GET)) {
+    } else if (md_strict_equal(b->idx.named.method->md,
+                               GRPC_MDELEM_METHOD_GET)) {
       *calld->recv_initial_metadata_flags |=
           GRPC_INITIAL_METADATA_CACHEABLE_REQUEST;
       *calld->recv_initial_metadata_flags &=
@@ -118,7 +178,7 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
                        GRPC_ERROR_CREATE_FROM_STATIC_STRING("Bad header"),
                        b->idx.named.method->md));
     }
-    grpc_metadata_batch_remove(b, b->idx.named.method);
+    grpc_metadata_batch_remove(b, GRPC_BATCH_METHOD);
   } else {
     hs_add_error(
         error_name, &error,
@@ -128,13 +188,14 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
   }
 
   if (b->idx.named.te != nullptr) {
-    if (!grpc_mdelem_eq(b->idx.named.te->md, GRPC_MDELEM_TE_TRAILERS)) {
+    if (!grpc_mdelem_static_value_eq(b->idx.named.te->md,
+                                     GRPC_MDELEM_TE_TRAILERS)) {
       hs_add_error(error_name, &error,
                    grpc_attach_md_to_error(
                        GRPC_ERROR_CREATE_FROM_STATIC_STRING("Bad header"),
                        b->idx.named.te->md));
     }
-    grpc_metadata_batch_remove(b, b->idx.named.te);
+    grpc_metadata_batch_remove(b, GRPC_BATCH_TE);
   } else {
     hs_add_error(error_name, &error,
                  grpc_error_set_str(
@@ -143,15 +204,16 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
   }
 
   if (b->idx.named.scheme != nullptr) {
-    if (!grpc_mdelem_eq(b->idx.named.scheme->md, GRPC_MDELEM_SCHEME_HTTP) &&
-        !grpc_mdelem_eq(b->idx.named.scheme->md, GRPC_MDELEM_SCHEME_HTTPS) &&
-        !grpc_mdelem_eq(b->idx.named.scheme->md, GRPC_MDELEM_SCHEME_GRPC)) {
+    if (!md_strict_equal(b->idx.named.scheme->md, GRPC_MDELEM_SCHEME_HTTP) &&
+        !md_strict_equal(b->idx.named.scheme->md, GRPC_MDELEM_SCHEME_HTTPS) &&
+        !grpc_mdelem_static_value_eq(b->idx.named.scheme->md,
+                                     GRPC_MDELEM_SCHEME_GRPC)) {
       hs_add_error(error_name, &error,
                    grpc_attach_md_to_error(
                        GRPC_ERROR_CREATE_FROM_STATIC_STRING("Bad header"),
                        b->idx.named.scheme->md));
     }
-    grpc_metadata_batch_remove(b, b->idx.named.scheme);
+    grpc_metadata_batch_remove(b, GRPC_BATCH_SCHEME);
   } else {
     hs_add_error(
         error_name, &error,
@@ -161,8 +223,9 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
   }
 
   if (b->idx.named.content_type != nullptr) {
-    if (!grpc_mdelem_eq(b->idx.named.content_type->md,
-                        GRPC_MDELEM_CONTENT_TYPE_APPLICATION_SLASH_GRPC)) {
+    if (!grpc_mdelem_static_value_eq(
+            b->idx.named.content_type->md,
+            GRPC_MDELEM_CONTENT_TYPE_APPLICATION_SLASH_GRPC)) {
       if (grpc_slice_buf_start_eq(GRPC_MDVALUE(b->idx.named.content_type->md),
                                   EXPECTED_CONTENT_TYPE,
                                   EXPECTED_CONTENT_TYPE_LENGTH) &&
@@ -186,7 +249,7 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
         gpr_free(val);
       }
     }
-    grpc_metadata_batch_remove(b, b->idx.named.content_type);
+    grpc_metadata_batch_remove(b, GRPC_BATCH_CONTENT_TYPE);
   }
 
   if (b->idx.named.path == nullptr) {
@@ -241,12 +304,13 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
     grpc_linked_mdelem* el = b->idx.named.host;
     grpc_mdelem md = GRPC_MDELEM_REF(el->md);
     grpc_metadata_batch_remove(b, el);
-    hs_add_error(error_name, &error,
-                 grpc_metadata_batch_add_head(
-                     b, el,
-                     grpc_mdelem_from_slices(
-                         GRPC_MDSTR_AUTHORITY,
-                         grpc_slice_ref_internal(GRPC_MDVALUE(md)))));
+    hs_add_error(
+        error_name, &error,
+        grpc_metadata_batch_add_head(
+            b, el,
+            grpc_mdelem_from_slices(GRPC_MDSTR_AUTHORITY,
+                                    grpc_slice_ref_internal(GRPC_MDVALUE(md))),
+            GRPC_BATCH_AUTHORITY));
     GRPC_MDELEM_UNREF(md);
   }
 
@@ -258,6 +322,11 @@ static grpc_error* hs_filter_incoming_metadata(grpc_call_element* elem,
             GRPC_ERROR_STR_KEY, grpc_slice_from_static_string(":authority")));
   }
 
+  channel_data* chand = static_cast<channel_data*>(elem->channel_data);
+  if (!chand->surface_user_agent && b->idx.named.user_agent != nullptr) {
+    grpc_metadata_batch_remove(b, GRPC_BATCH_USER_AGENT);
+  }
+
   return error;
 }
 
@@ -267,6 +336,7 @@ static void hs_recv_initial_metadata_ready(void* user_data, grpc_error* err) {
   calld->seen_recv_initial_metadata_ready = true;
   if (err == GRPC_ERROR_NONE) {
     err = hs_filter_incoming_metadata(elem, calld->recv_initial_metadata);
+    calld->recv_initial_metadata_ready_error = GRPC_ERROR_REF(err);
     if (calld->seen_recv_message_ready) {
       // We've already seen the recv_message callback, but we previously
       // deferred it, so we need to return it here.
@@ -286,7 +356,15 @@ static void hs_recv_initial_metadata_ready(void* user_data, grpc_error* err) {
   } else {
     GRPC_ERROR_REF(err);
   }
-  GRPC_CLOSURE_RUN(calld->original_recv_initial_metadata_ready, err);
+  if (calld->seen_recv_trailing_metadata_ready) {
+    GRPC_CALL_COMBINER_START(calld->call_combiner,
+                             &calld->recv_trailing_metadata_ready,
+                             calld->recv_trailing_metadata_ready_error,
+                             "resuming hs_recv_trailing_metadata_ready from "
+                             "hs_recv_initial_metadata_ready");
+  }
+  grpc_core::Closure::Run(DEBUG_LOCATION,
+                          calld->original_recv_initial_metadata_ready, err);
 }
 
 static void hs_recv_message_ready(void* user_data, grpc_error* err) {
@@ -301,7 +379,8 @@ static void hs_recv_message_ready(void* user_data, grpc_error* err) {
       calld->recv_message->reset(calld->read_stream.get());
       calld->have_read_stream = false;
     }
-    GRPC_CLOSURE_RUN(calld->original_recv_message_ready, GRPC_ERROR_REF(err));
+    grpc_core::Closure::Run(DEBUG_LOCATION, calld->original_recv_message_ready,
+                            GRPC_ERROR_REF(err));
   } else {
     // We have not yet seen the recv_initial_metadata callback, so we
     // need to wait to see if this is a GET request.
@@ -313,6 +392,24 @@ static void hs_recv_message_ready(void* user_data, grpc_error* err) {
   }
 }
 
+static void hs_recv_trailing_metadata_ready(void* user_data, grpc_error* err) {
+  grpc_call_element* elem = static_cast<grpc_call_element*>(user_data);
+  call_data* calld = static_cast<call_data*>(elem->call_data);
+  if (!calld->seen_recv_initial_metadata_ready) {
+    calld->recv_trailing_metadata_ready_error = GRPC_ERROR_REF(err);
+    calld->seen_recv_trailing_metadata_ready = true;
+    GRPC_CALL_COMBINER_STOP(calld->call_combiner,
+                            "deferring hs_recv_trailing_metadata_ready until "
+                            "ater hs_recv_initial_metadata_ready");
+    return;
+  }
+  err = grpc_error_add_child(
+      GRPC_ERROR_REF(err),
+      GRPC_ERROR_REF(calld->recv_initial_metadata_ready_error));
+  grpc_core::Closure::Run(DEBUG_LOCATION,
+                          calld->original_recv_trailing_metadata_ready, err);
+}
+
 static grpc_error* hs_mutate_op(grpc_call_element* elem,
                                 grpc_transport_stream_op_batch* op) {
   /* grab pointers to our data from the call element */
@@ -321,19 +418,20 @@ static grpc_error* hs_mutate_op(grpc_call_element* elem,
   if (op->send_initial_metadata) {
     grpc_error* error = GRPC_ERROR_NONE;
     static const char* error_name = "Failed sending initial metadata";
-    hs_add_error(error_name, &error,
-                 grpc_metadata_batch_add_head(
-                     op->payload->send_initial_metadata.send_initial_metadata,
-                     &calld->status, GRPC_MDELEM_STATUS_200));
+    hs_add_error(
+        error_name, &error,
+        grpc_metadata_batch_add_head(
+            op->payload->send_initial_metadata.send_initial_metadata,
+            &calld->status, GRPC_MDELEM_STATUS_200, GRPC_BATCH_STATUS));
     hs_add_error(error_name, &error,
                  grpc_metadata_batch_add_tail(
                      op->payload->send_initial_metadata.send_initial_metadata,
                      &calld->content_type,
-                     GRPC_MDELEM_CONTENT_TYPE_APPLICATION_SLASH_GRPC));
-    hs_add_error(
-        error_name, &error,
-        hs_filter_outgoing_metadata(
-            elem, op->payload->send_initial_metadata.send_initial_metadata));
+                     GRPC_MDELEM_CONTENT_TYPE_APPLICATION_SLASH_GRPC,
+                     GRPC_BATCH_CONTENT_TYPE));
+    hs_add_error(error_name, &error,
+                 hs_filter_outgoing_metadata(
+                     op->payload->send_initial_metadata.send_initial_metadata));
     if (error != GRPC_ERROR_NONE) return error;
   }
 
@@ -357,9 +455,16 @@ static grpc_error* hs_mutate_op(grpc_call_element* elem,
     op->payload->recv_message.recv_message_ready = &calld->recv_message_ready;
   }
 
+  if (op->recv_trailing_metadata) {
+    calld->original_recv_trailing_metadata_ready =
+        op->payload->recv_trailing_metadata.recv_trailing_metadata_ready;
+    op->payload->recv_trailing_metadata.recv_trailing_metadata_ready =
+        &calld->recv_trailing_metadata_ready;
+  }
+
   if (op->send_trailing_metadata) {
     grpc_error* error = hs_filter_outgoing_metadata(
-        elem, op->payload->send_trailing_metadata.send_trailing_metadata);
+        op->payload->send_trailing_metadata.send_trailing_metadata);
     if (error != GRPC_ERROR_NONE) return error;
   }
 
@@ -382,35 +487,32 @@ static void hs_start_transport_stream_op_batch(
 /* Constructor for call_data */
 static grpc_error* hs_init_call_elem(grpc_call_element* elem,
                                      const grpc_call_element_args* args) {
-  call_data* calld = static_cast<call_data*>(elem->call_data);
-  calld->call_combiner = args->call_combiner;
-  GRPC_CLOSURE_INIT(&calld->recv_initial_metadata_ready,
-                    hs_recv_initial_metadata_ready, elem,
-                    grpc_schedule_on_exec_ctx);
-  GRPC_CLOSURE_INIT(&calld->recv_message_ready, hs_recv_message_ready, elem,
-                    grpc_schedule_on_exec_ctx);
+  new (elem->call_data) call_data(elem, *args);
   return GRPC_ERROR_NONE;
 }
 
 /* Destructor for call_data */
 static void hs_destroy_call_elem(grpc_call_element* elem,
-                                 const grpc_call_final_info* final_info,
-                                 grpc_closure* ignored) {
+                                 const grpc_call_final_info* /*final_info*/,
+                                 grpc_closure* /*ignored*/) {
   call_data* calld = static_cast<call_data*>(elem->call_data);
-  if (calld->have_read_stream) {
-    calld->read_stream->Orphan();
-  }
+  calld->~call_data();
 }
 
 /* Constructor for channel_data */
 static grpc_error* hs_init_channel_elem(grpc_channel_element* elem,
                                         grpc_channel_element_args* args) {
+  channel_data* chand = static_cast<channel_data*>(elem->channel_data);
   GPR_ASSERT(!args->is_last);
+  chand->surface_user_agent = grpc_channel_arg_get_bool(
+      grpc_channel_args_find(args->channel_args,
+                             const_cast<char*>(GRPC_ARG_SURFACE_USER_AGENT)),
+      true);
   return GRPC_ERROR_NONE;
 }
 
 /* Destructor for channel data */
-static void hs_destroy_channel_elem(grpc_channel_element* elem) {}
+static void hs_destroy_channel_elem(grpc_channel_element* /*elem*/) {}
 
 const grpc_channel_filter grpc_http_server_filter = {
     hs_start_transport_stream_op_batch,
@@ -419,7 +521,7 @@ const grpc_channel_filter grpc_http_server_filter = {
     hs_init_call_elem,
     grpc_call_stack_ignore_set_pollset_or_pollset_set,
     hs_destroy_call_elem,
-    0,
+    sizeof(channel_data),
     hs_init_channel_elem,
     hs_destroy_channel_elem,
     grpc_channel_next_get_info,

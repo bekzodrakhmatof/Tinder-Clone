@@ -20,91 +20,75 @@
 
 #include "src/core/ext/filters/client_channel/client_channel.h"
 #include "src/core/ext/filters/client_channel/client_channel_channelz.h"
+#include "src/core/lib/channel/channelz_registry.h"
 #include "src/core/lib/gpr/useful.h"
 #include "src/core/lib/surface/channel.h"
 #include "src/core/lib/transport/connectivity_state.h"
 
+#include <grpc/support/string_util.h>
+
 namespace grpc_core {
 namespace channelz {
-namespace {
 
-void* client_channel_channelz_copy(void* p) { return p; }
+SubchannelNode::SubchannelNode(std::string target_address,
+                               size_t channel_tracer_max_nodes)
+    : BaseNode(EntityType::kSubchannel, target_address),
+      target_(std::move(target_address)),
+      trace_(channel_tracer_max_nodes) {}
 
-void client_channel_channelz_destroy(void* p) {}
+SubchannelNode::~SubchannelNode() {}
 
-int client_channel_channelz_cmp(void* a, void* b) { return GPR_ICMP(a, b); }
-
-}  // namespace
-
-static const grpc_arg_pointer_vtable client_channel_channelz_vtable = {
-    client_channel_channelz_copy, client_channel_channelz_destroy,
-    client_channel_channelz_cmp};
-
-ClientChannelNode::ClientChannelNode(grpc_channel* channel,
-                                     size_t channel_tracer_max_nodes)
-    : ChannelNode(channel, channel_tracer_max_nodes) {
-  client_channel_ =
-      grpc_channel_stack_last_element(grpc_channel_get_channel_stack(channel));
-  GPR_ASSERT(client_channel_->filter == &grpc_client_channel_filter);
+void SubchannelNode::UpdateConnectivityState(grpc_connectivity_state state) {
+  connectivity_state_.Store(state, MemoryOrder::RELAXED);
 }
 
-void ClientChannelNode::PopulateConnectivityState(grpc_json* json) {
-  grpc_connectivity_state state;
-  if (ChannelIsDestroyed()) {
-    state = GRPC_CHANNEL_SHUTDOWN;
-  } else {
-    state =
-        grpc_client_channel_check_connectivity_state(client_channel_, false);
+void SubchannelNode::SetChildSocket(RefCountedPtr<SocketNode> socket) {
+  MutexLock lock(&socket_mu_);
+  child_socket_ = std::move(socket);
+}
+
+Json SubchannelNode::RenderJson() {
+  // Create and fill the data child.
+  grpc_connectivity_state state =
+      connectivity_state_.Load(MemoryOrder::RELAXED);
+  Json::Object data = {
+      {"state",
+       Json::Object{
+           {"state", ConnectivityStateName(state)},
+       }},
+      {"target", target_},
+  };
+
+  // Fill in the channel trace if applicable
+  Json trace_json = trace_.RenderJson();
+  if (trace_json.type() != Json::Type::JSON_NULL) {
+    data["trace"] = std::move(trace_json);
   }
-  json = grpc_json_create_child(nullptr, json, "state", nullptr,
-                                GRPC_JSON_OBJECT, false);
-  grpc_json_create_child(nullptr, json, "state",
-                         grpc_connectivity_state_name(state), GRPC_JSON_STRING,
-                         false);
-}
-
-void ClientChannelNode::PopulateChildRefs(grpc_json* json) {
-  ChildRefsList child_subchannels;
-  ChildRefsList child_channels;
-  grpc_json* json_iterator = nullptr;
-  grpc_client_channel_populate_child_refs(client_channel_, &child_subchannels,
-                                          &child_channels);
-  if (child_subchannels.size() > 0) {
-    grpc_json* array_parent = grpc_json_create_child(
-        nullptr, json, "subchannelRef", nullptr, GRPC_JSON_ARRAY, false);
-    for (size_t i = 0; i < child_subchannels.size(); ++i) {
-      json_iterator =
-          grpc_json_create_child(json_iterator, array_parent, nullptr, nullptr,
-                                 GRPC_JSON_OBJECT, false);
-      grpc_json_add_number_string_child(json_iterator, nullptr, "subchannelId",
-                                        child_subchannels[i]);
-    }
+  // Ask CallCountingHelper to populate call count data.
+  call_counter_.PopulateCallCounts(&data);
+  // Construct top-level object.
+  Json::Object object{
+      {"ref",
+       Json::Object{
+           {"subchannelId", std::to_string(uuid())},
+       }},
+      {"data", std::move(data)},
+  };
+  // Populate the child socket.
+  RefCountedPtr<SocketNode> child_socket;
+  {
+    MutexLock lock(&socket_mu_);
+    child_socket = child_socket_;
   }
-  if (child_channels.size() > 0) {
-    grpc_json* array_parent = grpc_json_create_child(
-        nullptr, json, "channelRef", nullptr, GRPC_JSON_ARRAY, false);
-    json_iterator = nullptr;
-    for (size_t i = 0; i < child_subchannels.size(); ++i) {
-      json_iterator =
-          grpc_json_create_child(json_iterator, array_parent, nullptr, nullptr,
-                                 GRPC_JSON_OBJECT, false);
-      grpc_json_add_number_string_child(json_iterator, nullptr, "channelId",
-                                        child_subchannels[i]);
-    }
+  if (child_socket != nullptr && child_socket->uuid() != 0) {
+    object["socketRef"] = Json::Array{
+        Json::Object{
+            {"socketId", std::to_string(child_socket->uuid())},
+            {"name", child_socket->name()},
+        },
+    };
   }
-}
-
-grpc_arg ClientChannelNode::CreateChannelArg() {
-  return grpc_channel_arg_pointer_create(
-      const_cast<char*>(GRPC_ARG_CHANNELZ_CHANNEL_NODE_CREATION_FUNC),
-      reinterpret_cast<void*>(MakeClientChannelNode),
-      &client_channel_channelz_vtable);
-}
-
-RefCountedPtr<ChannelNode> ClientChannelNode::MakeClientChannelNode(
-    grpc_channel* channel, size_t channel_tracer_max_nodes) {
-  return MakePolymorphicRefCounted<ChannelNode, ClientChannelNode>(
-      channel, channel_tracer_max_nodes);
+  return object;
 }
 
 }  // namespace channelz

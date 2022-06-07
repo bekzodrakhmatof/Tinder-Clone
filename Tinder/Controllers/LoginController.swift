@@ -17,7 +17,7 @@ class LoginController: UIViewController {
     
     var loginDelegate: LoginControllerDelegate?
     
-    let emailTextField: UITextField = {
+    lazy var emailTextField: UITextField = {
         let textField = CustomTextField(padding: 22, height: 44)
         textField.placeholder = "Enger email"
         textField.keyboardType = .emailAddress
@@ -25,7 +25,7 @@ class LoginController: UIViewController {
         return textField
     }()
     
-    let passwordTextField: UITextField = {
+    lazy var passwordTextField: UITextField = {
         let textField = CustomTextField(padding: 22, height: 44)
         textField.placeholder = "Enter password"
         textField.isSecureTextEntry = true
@@ -33,7 +33,7 @@ class LoginController: UIViewController {
         return textField
     }()
     
-    let loginButton: UIButton = {
+    lazy var loginButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("Login", for: .normal)
         button.setTitleColor(#colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), for: .normal)
@@ -49,7 +49,7 @@ class LoginController: UIViewController {
         return button
     }()
     
-    fileprivate let backToRegisterButton: UIButton = {
+    lazy var backToRegisterButton: UIButton = {
         let button = UIButton()
         button.setTitle("Go Back", for: .normal)
         button.setTitleColor(.white, for: .normal)

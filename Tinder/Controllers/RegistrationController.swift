@@ -15,7 +15,7 @@ class RegistrationController: UIViewController {
     var loginControllerDelegate: LoginControllerDelegate?
     
     // UI Components
-    let selectPhotoButton: UIButton = {
+    lazy var selectPhotoButton: UIButton = {
         
         let button = UIButton(type: .system)
         button.setTitle("Select Photo", for: .normal)
@@ -30,7 +30,7 @@ class RegistrationController: UIViewController {
         return button
     }()
     
-    let fullNameTextField: CustomTextField = {
+    lazy var fullNameTextField: CustomTextField = {
         
         let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter full name"
@@ -39,7 +39,7 @@ class RegistrationController: UIViewController {
         return textField
     }()
     
-    let emailTextField: CustomTextField = {
+    lazy var emailTextField: CustomTextField = {
         
         let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter email"
@@ -49,7 +49,7 @@ class RegistrationController: UIViewController {
         return textField
     }()
     
-    let passwordTextField: CustomTextField = {
+    lazy var passwordTextField: CustomTextField = {
         
         let textField = CustomTextField(padding: 16, height: 44)
         textField.placeholder = "Enter password"
@@ -60,7 +60,7 @@ class RegistrationController: UIViewController {
         return textField
     }()
     
-    let registerButton: UIButton = {
+    lazy var registerButton: UIButton = {
         
         let button = UIButton(type: .system)
         button.setTitle("Register", for: .normal)
@@ -76,7 +76,7 @@ class RegistrationController: UIViewController {
         return button
     }()
     
-    let goToLoginButton: UIButton = {
+    lazy var goToLoginButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("Go to Login", for: .normal)
         button.setTitleColor(.white, for: .normal)

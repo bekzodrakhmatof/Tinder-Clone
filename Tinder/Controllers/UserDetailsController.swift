@@ -34,7 +34,7 @@ class UserDetailsController: UIViewController, UIScrollViewDelegate {
         return label
     }()
     
-    let dismissButton: UIButton = {
+    lazy var dismissButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(#imageLiteral(resourceName: "34").withRenderingMode(.alwaysOriginal), for: .normal)
         button.addTarget(self, action: #selector(handleDismissButton), for: .touchUpInside)

@@ -15,10 +15,20 @@
 #error "JGProgressHUD requires ARC!"
 #endif
 
-static CGRect JGProgressHUD_CGRectIntegral(CGRect rect) {
+static inline CGRect JGProgressHUD_CGRectIntegral(CGRect rect) {
     CGFloat scale = [[UIScreen mainScreen] scale];
     
     return (CGRect){{((CGFloat)floor(rect.origin.x*scale))/scale, ((CGFloat)floor(rect.origin.y*scale))/scale}, {((CGFloat)ceil(rect.size.width*scale))/scale, ((CGFloat)ceil(rect.size.height*scale))/scale}};
+}
+
+API_AVAILABLE(ios(12.0), tvos(10.0))
+static inline JGProgressHUDStyle JGProgressHUDStyleFromUIUserInterfaceStyle(UIUserInterfaceStyle uiStyle) {
+    if (uiStyle == UIUserInterfaceStyleDark) {
+        return JGProgressHUDStyleDark;
+    }
+    else {
+        return JGProgressHUDStyleExtraLight;
+    }
 }
 
 @interface JGProgressHUD () {
@@ -29,16 +39,30 @@ static CGRect JGProgressHUD_CGRectIntegral(CGRect rect) {
     BOOL _dismissAfterTransitionFinishedWithAnimation;
     
     CFAbsoluteTime _displayTimestamp;
+    dispatch_block_t __nullable _displayBlock;
     
-    JGProgressHUDIndicatorView *__nullable _indicatorViewAfterTransitioning;
+    BOOL _effectiveIndicatorViewNeedsUpdate;
     
     UIView *__nonnull _blurViewContainer;
     UIView *__nonnull _shadowView;
     CAShapeLayer *__nonnull _shadowMaskLayer;
+    
+    NSMutableArray<void (^)(void)> *_dismissActions;
+    
+    BOOL _automaticStyle;
 }
+
+// In 'beta'
+/**
+ Setting this to @c YES makes the text and indicator views bigger.
+ @b Default: NO.
+ */
+@property (nonatomic, assign) BOOL thick;
 
 @property (nonatomic, strong, readonly, nonnull) UIVisualEffectView *blurView;
 @property (nonatomic, strong, readonly, nonnull) UIVisualEffectView *vibrancyView;
+
+@property (nonatomic, strong, readonly, nonnull) JGProgressHUDIndicatorView *effectiveIndicatorView;
 
 @end
 
@@ -82,8 +106,6 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
 }
 
 + (void)load {
-    [super load];
-    
     @autoreleasepool {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardFrameWillChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
         
@@ -101,11 +123,11 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
 #pragma mark - Initializers
 
 - (instancetype)init {
-    return [self initWithStyle:JGProgressHUDStyleExtraLight];
+    return [self initWithAutomaticStyle];
 }
 
 - (instancetype)initWithFrame:(CGRect __unused)frame {
-    return [self initWithStyle:JGProgressHUDStyleExtraLight];
+    return [self initWithAutomaticStyle];
 }
 
 /*
@@ -127,6 +149,7 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
     if (self) {
         _style = style;
         _voiceOverEnabled = YES;
+        _automaticStyle = NO;
         
         _HUDView = [[UIView alloc] init];
         self.HUDView.backgroundColor = [UIColor clearColor];
@@ -153,7 +176,8 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
         [self.HUDView addSubview:_shadowView];
         
         _indicatorView = [[JGProgressHUDIndeterminateIndicatorView alloc] init];
-        [self.indicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
+        _effectiveIndicatorView = _indicatorView;
+        [self.effectiveIndicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
         
         self.hidden = YES;
         self.backgroundColor = [UIColor clearColor];
@@ -162,6 +186,8 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
         self.layoutMargins = UIEdgeInsetsMake(20.0, 20.0, 20.0, 20.0);
         
         self.cornerRadius = 10.0;
+        
+        _dismissActions = [[NSMutableArray alloc] init];
         
 #if TARGET_OS_IOS
         [self addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)]];
@@ -175,6 +201,34 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
 
 + (instancetype)progressHUDWithStyle:(JGProgressHUDStyle)style {
     return [(JGProgressHUD *)[self alloc] initWithStyle:style];
+}
+
+- (instancetype)initWithAutomaticStyle {
+    if (@available(iOS 12.0, tvOS 10.0, *)) {
+        JGProgressHUDStyle initialStyle;
+        
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            initialStyle = JGProgressHUDStyleFromUIUserInterfaceStyle([[UITraitCollection currentTraitCollection] userInterfaceStyle]);
+        }
+        else {
+            initialStyle = JGProgressHUDStyleExtraLight;
+        }
+        
+        self = [self initWithStyle:initialStyle];
+        
+        if (self != nil) {
+            _automaticStyle = YES;
+        }
+    }
+    else {
+        self = [self initWithStyle:JGProgressHUDStyleExtraLight];
+    }
+    
+    return self;
+}
+
++ (instancetype)progressHUDWithAutomaticStyle {
+    return [[self alloc] initWithAutomaticStyle];
 }
 
 #pragma mark - Layout
@@ -295,7 +349,7 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
         return;
     }
     
-    CGRect indicatorFrame = self.indicatorView.frame;
+    CGRect indicatorFrame = self.effectiveIndicatorView.frame;
     indicatorFrame.origin.y = self.contentInsets.top;
     
     CGRect insetFrame = [self insetFrameForView:self];
@@ -362,7 +416,7 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
     detailFrame.origin.x = center.x - detailFrame.size.width/2.0;
     
     [UIView performWithoutAnimation:^{
-        self.indicatorView.frame = indicatorFrame;
+        self.effectiveIndicatorView.frame = indicatorFrame;
         self->_textLabel.frame = JGProgressHUD_CGRectIntegral(labelFrame);
         self->_detailTextLabel.frame = JGProgressHUD_CGRectIntegral(detailFrame);
     }];
@@ -406,16 +460,16 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
         [self.targetView setNeedsFocusUpdate];
     }
 #endif
-
+    
     self.hidden = NO;
     
     _transitioning = NO;
     // Correct timestamp to the current time for animated presentations:
     _displayTimestamp = CFAbsoluteTimeGetCurrent();
     
-    if (_indicatorViewAfterTransitioning) {
-        self.indicatorView = _indicatorViewAfterTransitioning;
-        _indicatorViewAfterTransitioning = nil;
+    if (_effectiveIndicatorViewNeedsUpdate) {
+        self.effectiveIndicatorView = self.indicatorView;
+        _effectiveIndicatorViewNeedsUpdate = NO;
         _updateAfterAppear = NO;
     }
     else if (_updateAfterAppear) {
@@ -474,7 +528,7 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
     [NSLayoutConstraint constraintWithItem:self attribute:NSLayoutAttributeHeight relatedBy:NSLayoutRelationEqual toItem:_targetView attribute:NSLayoutAttributeHeight multiplier:1.0 constant:0.0].active = YES;
     [NSLayoutConstraint constraintWithItem:self attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:_targetView attribute:NSLayoutAttributeCenterX multiplier:1.0 constant:0.0].active = YES;
     [NSLayoutConstraint constraintWithItem:self attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:_targetView attribute:NSLayoutAttributeCenterY multiplier:1.0 constant:0.0].active = YES;
-
+    
     [self setNeedsLayout];
     [self layoutIfNeeded];
     
@@ -495,6 +549,27 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
 #endif
 }
 
+- (void)showInView:(UIView *__nonnull)view animated:(BOOL)animated afterDelay:(NSTimeInterval)delay {
+    __weak __typeof(self) weakSelf = self;
+
+    if (_displayBlock != NULL) {
+        dispatch_cancel(_displayBlock);
+    }
+
+    _displayBlock = dispatch_block_create(0, ^{
+        if (weakSelf) {
+            __strong __typeof(weakSelf) strongSelf = weakSelf;
+            strongSelf->_displayBlock = NULL;
+            
+            if (!strongSelf.visible) {
+                [strongSelf showInView:view animated:animated];
+            }
+        }
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), _displayBlock);
+}
+
 #pragma mark - Dismissing
 
 - (void)cleanUpAfterDismissal {
@@ -510,6 +585,11 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
     __typeof(self.targetView) targetView = self.targetView;
     _targetView = nil;
     
+    for (void (^action)(void) in _dismissActions) {
+        action();
+    }
+    [_dismissActions removeAllObjects];
+    
     if ([self.delegate respondsToSelector:@selector(progressHUD:didDismissFromView:)]) {
         [self.delegate progressHUD:self didDismissFromView:targetView];
     }
@@ -520,6 +600,11 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
 }
 
 - (void)dismissAnimated:(BOOL)animated {
+    if (_displayBlock != NULL) {
+        dispatch_cancel(_displayBlock);
+        _displayBlock = NULL;
+    }
+
     if (_transitioning) {
         _dismissAfterTransitionFinished = YES;
         _dismissAfterTransitionFinishedWithAnimation = animated;
@@ -561,16 +646,29 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
 }
 
 - (void)dismissAfterDelay:(NSTimeInterval)delay animated:(BOOL)animated {
+    [self dismissAfterDelay:delay animated:animated completion:nil];
+}
+
+- (void)dismissAfterDelay:(NSTimeInterval)delay animated:(BOOL)animated completion:(void (^_Nullable)(void))dismissCompletion {
     __weak __typeof(self) weakSelf = self;
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (weakSelf) {
             __strong __typeof(weakSelf) strongSelf = weakSelf;
             if (strongSelf.visible) {
+                if (dismissCompletion != nil) {
+                    [self performAfterDismiss:dismissCompletion];
+                }
                 [strongSelf dismissAnimated:animated];
             }
         }
     });
+}
+
+- (void)performAfterDismiss:(void (^_Nonnull)(void))dismissCompletion {
+    if (self.visible) {
+        [_dismissActions addObject:dismissCompletion];
+    }
 }
 
 #pragma mark - Callbacks
@@ -587,7 +685,7 @@ static CGRect keyboardFrame = (CGRect){{0.0, 0.0}, {0.0, 0.0}};
     }
 }
 
-static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIViewAnimationCurve curve) {
+static inline UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIViewAnimationCurve curve) {
     UIViewAnimationOptions testOptions = UIViewAnimationCurveLinear << 16;
     
     if (testOptions != UIViewAnimationOptionCurveLinear) {
@@ -690,7 +788,7 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
         UIVibrancyEffect *vibrancyEffect = (self.vibrancyEnabled ? [UIVibrancyEffect effectForBlurEffect:(UIBlurEffect *)self.blurView.effect] : nil);
         
         _vibrancyView = [[UIVisualEffectView alloc] initWithEffect:vibrancyEffect];
-
+        
         [self.blurView.contentView addSubview:_vibrancyView];
     }
     
@@ -702,8 +800,8 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
         _contentView = [[UIView alloc] init];
         [self.vibrancyView.contentView addSubview:_contentView];
         
-        if (self.indicatorView != nil) {
-            [self.contentView addSubview:self.indicatorView];
+        if (self.effectiveIndicatorView != nil) {
+            [self.contentView addSubview:self.effectiveIndicatorView];
         }
     }
     
@@ -721,6 +819,10 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
 #else
         CGFloat fontSize = 17.0;
 #endif
+        if (self.thick) {
+            fontSize *= 1.3;
+        }
+        
         _textLabel.font = [UIFont boldSystemFontOfSize:fontSize];
         _textLabel.numberOfLines = 0;
         [_textLabel addObserver:self forKeyPath:@"attributedText" options:(NSKeyValueObservingOptions)kNilOptions context:NULL];
@@ -745,6 +847,10 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
 #else
         CGFloat fontSize = 15.0;
 #endif
+        if (self.thick) {
+            fontSize *= 1.3;
+        }
+        
         _detailTextLabel.font = [UIFont systemFontOfSize:fontSize];
         _detailTextLabel.numberOfLines = 0;
         [_detailTextLabel addObserver:self forKeyPath:@"attributedText" options:(NSKeyValueObservingOptions)kNilOptions context:NULL];
@@ -768,16 +874,51 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
 
 #pragma mark - Setters
 
+- (void)setStyle:(JGProgressHUDStyle)style {
+    if (self.style == style) {
+        return;
+    }
+    
+    _style = style;
+    
+    // Update indicator
+    [self.effectiveIndicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
+    
+    // Update labels
+    self.textLabel.textColor = (self.style == JGProgressHUDStyleDark ? [UIColor whiteColor] : [UIColor blackColor]);
+    self.detailTextLabel.textColor = (self.style == JGProgressHUDStyleDark ? [UIColor whiteColor] : [UIColor blackColor]);
+    
+    // Update blur effect
+    UIBlurEffectStyle effect;
+    
+    if (self.style == JGProgressHUDStyleDark) {
+        effect = UIBlurEffectStyleDark;
+    }
+    else if (self.style == JGProgressHUDStyleLight) {
+        effect = UIBlurEffectStyleLight;
+    }
+    else {
+        effect = UIBlurEffectStyleExtraLight;
+    }
+    
+    UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:effect];
+    self.blurView.effect = blurEffect;
+    
+    // Update vibrancy effect
+    UIVibrancyEffect *vibrancyEffect = (self.vibrancyEnabled ? [UIVibrancyEffect effectForBlurEffect:(UIBlurEffect *)self.blurView.effect] : nil);
+    self.vibrancyView.effect = vibrancyEffect;
+}
+
 #if TARGET_OS_TV
 - (void)setWantsFocus:(BOOL)wantsFocus {
     if (self.wantsFocus == wantsFocus) {
         return;
     }
-
+    
     _wantsFocus = wantsFocus;
-
+    
     self.userInteractionEnabled = self.wantsFocus;
-
+    
     [self.targetView setNeedsFocusUpdate];
 }
 #endif
@@ -857,6 +998,44 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
     [self layoutHUD];
 }
 
+- (void)setThick:(BOOL)thick {
+    if (self.thick == thick) {
+        return;
+    }
+    
+    _thick = thick;
+    
+    if (self.thick) {
+        self.indicatorView.transform = CGAffineTransformMakeScale(1.5, 1.5);
+    }
+    else {
+        self.indicatorView.transform = CGAffineTransformIdentity;
+    }
+    
+#if TARGET_OS_TV
+    CGFloat fontSize = 20.0;
+#else
+    CGFloat fontSize = 17.0;
+#endif
+    if (self.thick) {
+        fontSize *= 1.3;
+    }
+    
+    _textLabel.font = [UIFont boldSystemFontOfSize:fontSize];
+#if TARGET_OS_TV
+    fontSize = 17.0;
+#else
+    fontSize = 15.0;
+#endif
+    if (self.thick) {
+        fontSize *= 1.3;
+    }
+    
+    _detailTextLabel.font = [UIFont systemFontOfSize:fontSize];
+    
+    [self layoutHUD];
+}
+
 - (void)setVibrancyEnabled:(BOOL)vibrancyEnabled {
     if (vibrancyEnabled == self.vibrancyEnabled) {
         return;
@@ -868,7 +1047,7 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
     
     self.vibrancyView.effect = vibrancyEffect;
     
-    [self.indicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
+    [self.effectiveIndicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
 }
 
 - (void)setIndicatorView:(JGProgressHUDIndicatorView *)indicatorView {
@@ -876,18 +1055,37 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
         return;
     }
     
+    _indicatorView = indicatorView;
+    
     if (_transitioning) {
-        _indicatorViewAfterTransitioning = indicatorView;
+        _effectiveIndicatorViewNeedsUpdate = YES;
+        return;
+    }
+    else {
+        self.effectiveIndicatorView = self.indicatorView;
+    }
+}
+
+- (void)setEffectiveIndicatorView:(JGProgressHUDIndicatorView * _Nonnull)effectiveIndicatorView {
+    if (self.effectiveIndicatorView == effectiveIndicatorView) {
         return;
     }
     
     [UIView performWithoutAnimation:^{
-        [self->_indicatorView removeFromSuperview];
-        self->_indicatorView = indicatorView;
+        [self->_effectiveIndicatorView removeFromSuperview];
+        self->_effectiveIndicatorView = effectiveIndicatorView;
         
         if (self.indicatorView != nil) {
-            [self.indicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
-            [self.contentView addSubview:self.indicatorView];
+            [self.effectiveIndicatorView setUpForHUDStyle:self.style vibrancyEnabled:self.vibrancyEnabled];
+            
+            if (self.thick) {
+                self.effectiveIndicatorView.transform = CGAffineTransformMakeScale(1.5, 1.5);
+            }
+            else {
+                self.effectiveIndicatorView.transform = CGAffineTransformIdentity;
+            }
+            
+            [self.contentView addSubview:self.effectiveIndicatorView];
         }
     }];
     
@@ -929,10 +1127,20 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
     
     _progress = progress;
     
-    [self.indicatorView setProgress:progress animated:animated];
+    [self.effectiveIndicatorView setProgress:progress animated:animated];
 }
 
 #pragma mark - Overrides
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 12.0, tvOS 10.0, *)) {
+        if (_automaticStyle) {
+            self.style = JGProgressHUDStyleFromUIUserInterfaceStyle(self.traitCollection.userInterfaceStyle);
+        }
+    }
+}
 
 #if TARGET_OS_IOS
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
@@ -941,7 +1149,7 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
     }
     else {
         UIView *view = [super hitTest:point withEvent:event];
-
+        
         if (self.interactionType == JGProgressHUDInteractionTypeBlockAllTouches) {
             return view;
         }
@@ -1029,18 +1237,6 @@ static UIViewAnimationOptions UIViewAnimationOptionsFromUIViewAnimationCurve(UIV
 
 + (NSArray *)allProgressHUDsInViewHierarchy:(UIView *)view {
     return [self _allProgressHUDsInViewHierarchy:view].copy;
-}
-
-@end
-
-@implementation JGProgressHUD (Deprecated)
-
-- (void)showInRect:(CGRect __unused)rect inView:(UIView *)view {
-    [self showInView:view];
-}
-
-- (void)showInRect:(CGRect __unused)rect inView:(UIView *)view animated:(BOOL)animated {
-    [self showInView:view animated:animated];
 }
 
 @end

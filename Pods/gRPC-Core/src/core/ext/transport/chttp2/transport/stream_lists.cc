@@ -35,8 +35,6 @@ static const char* stream_list_id_string(grpc_chttp2_stream_list_id id) {
       return "stalled_by_stream";
     case GRPC_CHTTP2_LIST_WAITING_FOR_CONCURRENCY:
       return "waiting_for_concurrency";
-    case GRPC_CHTTP2_LIST_WAITING_FOR_WRITE:
-      return "waiting_for_write";
     case STREAM_LIST_COUNT:
       GPR_UNREACHABLE_CODE(return "unknown");
   }
@@ -69,7 +67,7 @@ static bool stream_list_pop(grpc_chttp2_transport* t,
     s->included[id] = 0;
   }
   *stream = s;
-  if (s && grpc_trace_http2_stream_state.enabled()) {
+  if (s && GRPC_TRACE_FLAG_ENABLED(grpc_trace_http2_stream_state)) {
     gpr_log(GPR_INFO, "%p[%d][%s]: pop from %s", t, s->id,
             t->is_client ? "cli" : "svr", stream_list_id_string(id));
   }
@@ -91,7 +89,7 @@ static void stream_list_remove(grpc_chttp2_transport* t, grpc_chttp2_stream* s,
   } else {
     t->lists[id].tail = s->links[id].prev;
   }
-  if (grpc_trace_http2_stream_state.enabled()) {
+  if (GRPC_TRACE_FLAG_ENABLED(grpc_trace_http2_stream_state)) {
     gpr_log(GPR_INFO, "%p[%d][%s]: remove from %s", t, s->id,
             t->is_client ? "cli" : "svr", stream_list_id_string(id));
   }
@@ -123,7 +121,7 @@ static void stream_list_add_tail(grpc_chttp2_transport* t,
   }
   t->lists[id].tail = s;
   s->included[id] = 1;
-  if (grpc_trace_http2_stream_state.enabled()) {
+  if (GRPC_TRACE_FLAG_ENABLED(grpc_trace_http2_stream_state)) {
     gpr_log(GPR_INFO, "%p[%d][%s]: add to %s", t, s->id,
             t->is_client ? "cli" : "svr", stream_list_id_string(id));
   }
@@ -215,19 +213,4 @@ bool grpc_chttp2_list_pop_stalled_by_stream(grpc_chttp2_transport* t,
 bool grpc_chttp2_list_remove_stalled_by_stream(grpc_chttp2_transport* t,
                                                grpc_chttp2_stream* s) {
   return stream_list_maybe_remove(t, s, GRPC_CHTTP2_LIST_STALLED_BY_STREAM);
-}
-
-bool grpc_chttp2_list_add_waiting_for_write_stream(grpc_chttp2_transport* t,
-                                                   grpc_chttp2_stream* s) {
-  return stream_list_add(t, s, GRPC_CHTTP2_LIST_WAITING_FOR_WRITE);
-}
-
-bool grpc_chttp2_list_pop_waiting_for_write_stream(grpc_chttp2_transport* t,
-                                                   grpc_chttp2_stream** s) {
-  return stream_list_pop(t, s, GRPC_CHTTP2_LIST_WAITING_FOR_WRITE);
-}
-
-bool grpc_chttp2_list_remove_waiting_for_write_stream(grpc_chttp2_transport* t,
-                                                      grpc_chttp2_stream* s) {
-  return stream_list_maybe_remove(t, s, GRPC_CHTTP2_LIST_WAITING_FOR_WRITE);
 }

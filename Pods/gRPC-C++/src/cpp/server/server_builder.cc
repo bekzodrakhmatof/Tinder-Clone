@@ -26,31 +26,31 @@
 
 #include <utility>
 
+#include "src/core/lib/channel/channel_args.h"
+#include "src/core/lib/gpr/string.h"
 #include "src/core/lib/gpr/useful.h"
+#include "src/cpp/server/external_connection_acceptor_impl.h"
 #include "src/cpp/server/thread_pool_interface.h"
 
-namespace grpc {
+namespace grpc_impl {
 
-static std::vector<std::unique_ptr<ServerBuilderPlugin> (*)()>*
+static std::vector<std::unique_ptr<grpc::ServerBuilderPlugin> (*)()>*
     g_plugin_factory_list;
 static gpr_once once_init_plugin_list = GPR_ONCE_INIT;
 
 static void do_plugin_list_init(void) {
   g_plugin_factory_list =
-      new std::vector<std::unique_ptr<ServerBuilderPlugin> (*)()>();
+      new std::vector<std::unique_ptr<grpc::ServerBuilderPlugin> (*)()>();
 }
 
 ServerBuilder::ServerBuilder()
     : max_receive_message_size_(INT_MIN),
       max_send_message_size_(INT_MIN),
       sync_server_settings_(SyncServerSettings()),
-      resource_quota_(nullptr),
-      generic_service_(nullptr) {
+      resource_quota_(nullptr) {
   gpr_once_init(&once_init_plugin_list, do_plugin_list_init);
-  for (auto it = g_plugin_factory_list->begin();
-       it != g_plugin_factory_list->end(); it++) {
-    auto& factory = *it;
-    plugins_.emplace_back(factory());
+  for (const auto& value : *g_plugin_factory_list) {
+    plugins_.emplace_back(value());
   }
 
   // all compression algorithms enabled by default.
@@ -71,27 +71,29 @@ ServerBuilder::~ServerBuilder() {
 std::unique_ptr<ServerCompletionQueue> ServerBuilder::AddCompletionQueue(
     bool is_frequently_polled) {
   ServerCompletionQueue* cq = new ServerCompletionQueue(
-      is_frequently_polled ? GRPC_CQ_DEFAULT_POLLING : GRPC_CQ_NON_LISTENING);
+      GRPC_CQ_NEXT,
+      is_frequently_polled ? GRPC_CQ_DEFAULT_POLLING : GRPC_CQ_NON_LISTENING,
+      nullptr);
   cqs_.push_back(cq);
   return std::unique_ptr<ServerCompletionQueue>(cq);
 }
 
-ServerBuilder& ServerBuilder::RegisterService(Service* service) {
+ServerBuilder& ServerBuilder::RegisterService(grpc::Service* service) {
   services_.emplace_back(new NamedService(service));
   return *this;
 }
 
 ServerBuilder& ServerBuilder::RegisterService(const grpc::string& addr,
-                                              Service* service) {
+                                              grpc::Service* service) {
   services_.emplace_back(new NamedService(addr, service));
   return *this;
 }
 
 ServerBuilder& ServerBuilder::RegisterAsyncGenericService(
-    AsyncGenericService* service) {
-  if (generic_service_) {
+    grpc::AsyncGenericService* service) {
+  if (generic_service_ || callback_generic_service_) {
     gpr_log(GPR_ERROR,
-            "Adding multiple AsyncGenericService is unsupported for now. "
+            "Adding multiple generic services is unsupported for now. "
             "Dropping the service %p",
             (void*)service);
   } else {
@@ -100,8 +102,49 @@ ServerBuilder& ServerBuilder::RegisterAsyncGenericService(
   return *this;
 }
 
+#ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+ServerBuilder& ServerBuilder::RegisterCallbackGenericService(
+    grpc::CallbackGenericService* service) {
+  if (generic_service_ || callback_generic_service_) {
+    gpr_log(GPR_ERROR,
+            "Adding multiple generic services is unsupported for now. "
+            "Dropping the service %p",
+            (void*)service);
+  } else {
+    callback_generic_service_ = service;
+  }
+  return *this;
+}
+#else
+ServerBuilder& ServerBuilder::experimental_type::RegisterCallbackGenericService(
+    grpc::experimental::CallbackGenericService* service) {
+  if (builder_->generic_service_ || builder_->callback_generic_service_) {
+    gpr_log(GPR_ERROR,
+            "Adding multiple generic services is unsupported for now. "
+            "Dropping the service %p",
+            (void*)service);
+  } else {
+    builder_->callback_generic_service_ = service;
+  }
+  return *builder_;
+}
+#endif
+
+std::unique_ptr<grpc::experimental::ExternalConnectionAcceptor>
+ServerBuilder::experimental_type::AddExternalConnectionAcceptor(
+    experimental_type::ExternalConnectionType type,
+    std::shared_ptr<ServerCredentials> creds) {
+  grpc::string name_prefix("external:");
+  char count_str[GPR_LTOA_MIN_BUFSIZE];
+  gpr_ltoa(static_cast<long>(builder_->acceptors_.size()), count_str);
+  builder_->acceptors_.emplace_back(
+      std::make_shared<grpc::internal::ExternalConnectionAcceptorImpl>(
+          name_prefix.append(count_str), type, creds));
+  return builder_->acceptors_.back()->GetAcceptor();
+}
+
 ServerBuilder& ServerBuilder::SetOption(
-    std::unique_ptr<ServerBuilderOption> option) {
+    std::unique_ptr<grpc::ServerBuilderOption> option) {
   options_.push_back(std::move(option));
   return *this;
 }
@@ -137,6 +180,7 @@ ServerBuilder& ServerBuilder::SetCompressionAlgorithmSupportStatus(
 
 ServerBuilder& ServerBuilder::SetDefaultCompressionLevel(
     grpc_compression_level level) {
+  maybe_default_compression_level_.is_set = true;
   maybe_default_compression_level_.level = level;
   return *this;
 }
@@ -149,7 +193,7 @@ ServerBuilder& ServerBuilder::SetDefaultCompressionAlgorithm(
 }
 
 ServerBuilder& ServerBuilder::SetResourceQuota(
-    const grpc::ResourceQuota& resource_quota) {
+    const grpc_impl::ResourceQuota& resource_quota) {
   if (resource_quota_ != nullptr) {
     grpc_resource_quota_unref(resource_quota_);
   }
@@ -159,8 +203,8 @@ ServerBuilder& ServerBuilder::SetResourceQuota(
 }
 
 ServerBuilder& ServerBuilder::AddListeningPort(
-    const grpc::string& addr_uri, std::shared_ptr<ServerCredentials> creds,
-    int* selected_port) {
+    const grpc::string& addr_uri,
+    std::shared_ptr<grpc::ServerCredentials> creds, int* selected_port) {
   const grpc::string uri_scheme = "dns:";
   grpc::string addr = addr_uri;
   if (addr_uri.compare(0, uri_scheme.size(), uri_scheme) == 0) {
@@ -173,22 +217,26 @@ ServerBuilder& ServerBuilder::AddListeningPort(
   return *this;
 }
 
-std::unique_ptr<Server> ServerBuilder::BuildAndStart() {
-  ChannelArguments args;
-  for (auto option = options_.begin(); option != options_.end(); ++option) {
-    (*option)->UpdateArguments(&args);
-    (*option)->UpdatePlugins(&plugins_);
-  }
+std::unique_ptr<grpc::Server> ServerBuilder::BuildAndStart() {
+  grpc::ChannelArguments args;
 
-  for (auto plugin = plugins_.begin(); plugin != plugins_.end(); plugin++) {
-    (*plugin)->UpdateServerBuilder(this);
-    (*plugin)->UpdateChannelArguments(&args);
+  for (const auto& option : options_) {
+    option->UpdateArguments(&args);
+    option->UpdatePlugins(&plugins_);
   }
-
   if (max_receive_message_size_ >= -1) {
+    grpc_channel_args c_args = args.c_channel_args();
+    const grpc_arg* arg =
+        grpc_channel_args_find(&c_args, GRPC_ARG_MAX_RECEIVE_MESSAGE_LENGTH);
+    // Some option has set max_receive_message_length and it is also set
+    // directly on the ServerBuilder.
+    if (arg != nullptr) {
+      gpr_log(
+          GPR_ERROR,
+          "gRPC ServerBuilder receives multiple max_receive_message_length");
+    }
     args.SetInt(GRPC_ARG_MAX_RECEIVE_MESSAGE_LENGTH, max_receive_message_size_);
   }
-
   // The default message size is -1 (max), so no need to explicitly set it for
   // -1.
   if (max_send_message_size_ >= 0) {
@@ -211,18 +259,23 @@ std::unique_ptr<Server> ServerBuilder::BuildAndStart() {
                               grpc_resource_quota_arg_vtable());
   }
 
+  for (const auto& plugin : plugins_) {
+    plugin->UpdateServerBuilder(this);
+    plugin->UpdateChannelArguments(&args);
+  }
+
   // == Determine if the server has any syncrhonous methods ==
   bool has_sync_methods = false;
-  for (auto it = services_.begin(); it != services_.end(); ++it) {
-    if ((*it)->service->has_synchronous_methods()) {
+  for (const auto& value : services_) {
+    if (value->service->has_synchronous_methods()) {
       has_sync_methods = true;
       break;
     }
   }
 
   if (!has_sync_methods) {
-    for (auto plugin = plugins_.begin(); plugin != plugins_.end(); plugin++) {
-      if ((*plugin)->has_sync_methods()) {
+    for (const auto& value : plugins_) {
+      if (value->has_sync_methods()) {
         has_sync_methods = true;
         break;
       }
@@ -240,15 +293,25 @@ std::unique_ptr<Server> ServerBuilder::BuildAndStart() {
       sync_server_cqs(std::make_shared<
                       std::vector<std::unique_ptr<ServerCompletionQueue>>>());
 
-  int num_frequently_polled_cqs = 0;
-  for (auto it = cqs_.begin(); it != cqs_.end(); ++it) {
-    if ((*it)->IsFrequentlyPolled()) {
-      num_frequently_polled_cqs++;
+  bool has_frequently_polled_cqs = false;
+  for (const auto& cq : cqs_) {
+    if (cq->IsFrequentlyPolled()) {
+      has_frequently_polled_cqs = true;
+      break;
     }
   }
 
-  const bool is_hybrid_server =
-      has_sync_methods && num_frequently_polled_cqs > 0;
+  // == Determine if the server has any callback methods ==
+  bool has_callback_methods = false;
+  for (const auto& service : services_) {
+    if (service->service->has_callback_methods()) {
+      has_callback_methods = true;
+      has_frequently_polled_cqs = true;
+      break;
+    }
+  }
+
+  const bool is_hybrid_server = has_sync_methods && has_frequently_polled_cqs;
 
   if (has_sync_methods) {
     grpc_cq_polling_type polling_type =
@@ -256,14 +319,13 @@ std::unique_ptr<Server> ServerBuilder::BuildAndStart() {
 
     // Create completion queues to listen to incoming rpc requests
     for (int i = 0; i < sync_server_settings_.num_cqs; i++) {
-      sync_server_cqs->emplace_back(new ServerCompletionQueue(polling_type));
+      sync_server_cqs->emplace_back(
+          new ServerCompletionQueue(GRPC_CQ_NEXT, polling_type, nullptr));
     }
   }
 
-  std::unique_ptr<Server> server(new Server(
-      max_receive_message_size_, &args, sync_server_cqs,
-      sync_server_settings_.min_pollers, sync_server_settings_.max_pollers,
-      sync_server_settings_.cq_timeout_msec));
+  // TODO(vjpai): Add a section here for plugins once they can support callback
+  // methods
 
   if (has_sync_methods) {
     // This is a Sync server
@@ -275,51 +337,68 @@ std::unique_ptr<Server> ServerBuilder::BuildAndStart() {
             sync_server_settings_.cq_timeout_msec);
   }
 
-  ServerInitializer* initializer = server->initializer();
+  if (has_callback_methods) {
+    gpr_log(GPR_INFO, "Callback server.");
+  }
+
+  std::unique_ptr<grpc::Server> server(new grpc::Server(
+      &args, sync_server_cqs, sync_server_settings_.min_pollers,
+      sync_server_settings_.max_pollers, sync_server_settings_.cq_timeout_msec,
+      std::move(acceptors_), resource_quota_,
+      std::move(interceptor_creators_)));
+
+  grpc_impl::ServerInitializer* initializer = server->initializer();
 
   // Register all the completion queues with the server. i.e
   //  1. sync_server_cqs: internal completion queues created IF this is a sync
   //     server
   //  2. cqs_: Completion queues added via AddCompletionQueue() call
 
-  for (auto it = sync_server_cqs->begin(); it != sync_server_cqs->end(); ++it) {
-    grpc_server_register_completion_queue(server->server_, (*it)->cq(),
-                                          nullptr);
-    num_frequently_polled_cqs++;
+  for (const auto& cq : *sync_server_cqs) {
+    grpc_server_register_completion_queue(server->server_, cq->cq(), nullptr);
+    has_frequently_polled_cqs = true;
+  }
+
+  if (has_callback_methods || callback_generic_service_ != nullptr) {
+    auto* cq = server->CallbackCQ();
+    grpc_server_register_completion_queue(server->server_, cq->cq(), nullptr);
   }
 
   // cqs_ contains the completion queue added by calling the ServerBuilder's
   // AddCompletionQueue() API. Some of them may not be frequently polled (i.e by
   // calling Next() or AsyncNext()) and hence are not safe to be used for
   // listening to incoming channels. Such completion queues must be registered
-  // as non-listening queues
-  for (auto it = cqs_.begin(); it != cqs_.end(); ++it) {
-    grpc_server_register_completion_queue(server->server_, (*it)->cq(),
-                                          nullptr);
+  // as non-listening queues. In debug mode, these should have their server list
+  // tracked since these are provided the user and must be Shutdown by the user
+  // after the server is shutdown.
+  for (const auto& cq : cqs_) {
+    grpc_server_register_completion_queue(server->server_, cq->cq(), nullptr);
+    cq->RegisterServer(server.get());
   }
 
-  if (num_frequently_polled_cqs == 0) {
+  if (!has_frequently_polled_cqs) {
     gpr_log(GPR_ERROR,
             "At least one of the completion queues must be frequently polled");
     return nullptr;
   }
 
-  for (auto service = services_.begin(); service != services_.end();
-       service++) {
-    if (!server->RegisterService((*service)->host.get(), (*service)->service)) {
+  for (const auto& value : services_) {
+    if (!server->RegisterService(value->host.get(), value->service)) {
       return nullptr;
     }
   }
 
-  for (auto plugin = plugins_.begin(); plugin != plugins_.end(); plugin++) {
-    (*plugin)->InitServer(initializer);
+  for (const auto& value : plugins_) {
+    value->InitServer(initializer);
   }
 
   if (generic_service_) {
     server->RegisterAsyncGenericService(generic_service_);
+  } else if (callback_generic_service_) {
+    server->RegisterCallbackGenericService(callback_generic_service_);
   } else {
-    for (auto it = services_.begin(); it != services_.end(); ++it) {
-      if ((*it)->service->has_generic_methods()) {
+    for (const auto& value : services_) {
+      if (value->service->has_generic_methods()) {
         gpr_log(GPR_ERROR,
                 "Some methods were marked generic but there is no "
                 "generic service registered.");
@@ -329,30 +408,30 @@ std::unique_ptr<Server> ServerBuilder::BuildAndStart() {
   }
 
   bool added_port = false;
-  for (auto port = ports_.begin(); port != ports_.end(); port++) {
-    int r = server->AddListeningPort(port->addr, port->creds.get());
+  for (auto& port : ports_) {
+    int r = server->AddListeningPort(port.addr, port.creds.get());
     if (!r) {
       if (added_port) server->Shutdown();
       return nullptr;
     }
     added_port = true;
-    if (port->selected_port != nullptr) {
-      *port->selected_port = r;
+    if (port.selected_port != nullptr) {
+      *port.selected_port = r;
     }
   }
 
   auto cqs_data = cqs_.empty() ? nullptr : &cqs_[0];
   server->Start(cqs_data, cqs_.size());
 
-  for (auto plugin = plugins_.begin(); plugin != plugins_.end(); plugin++) {
-    (*plugin)->Finish(initializer);
+  for (const auto& value : plugins_) {
+    value->Finish(initializer);
   }
 
   return server;
 }
 
 void ServerBuilder::InternalAddPluginFactory(
-    std::unique_ptr<ServerBuilderPlugin> (*CreatePlugin)()) {
+    std::unique_ptr<grpc::ServerBuilderPlugin> (*CreatePlugin)()) {
   gpr_once_init(&once_init_plugin_list, do_plugin_list_init);
   (*g_plugin_factory_list).push_back(CreatePlugin);
 }
@@ -367,4 +446,4 @@ ServerBuilder& ServerBuilder::EnableWorkaround(grpc_workaround_list id) {
   }
 }
 
-}  // namespace grpc
+}  // namespace grpc_impl

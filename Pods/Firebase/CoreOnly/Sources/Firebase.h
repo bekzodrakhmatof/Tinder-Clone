@@ -1,3 +1,17 @@
+// Copyright 2019 Google
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #import <FirebaseCore/FirebaseCore.h>
 
 #if !defined(__has_include)
@@ -6,20 +20,22 @@
 #else
   #if __has_include(<FirebaseAnalytics/FirebaseAnalytics.h>)
     #import <FirebaseAnalytics/FirebaseAnalytics.h>
-  #else
-    #ifndef FIREBASE_ANALYTICS_SUPPRESS_WARNING
-      #warning "FirebaseAnalytics.framework is not included in your target. Please add \
-`Firebase/Core` to your Podfile or add FirebaseAnalytics.framework to your project to ensure \
-Firebase services work as intended."
-    #endif // #ifndef FIREBASE_ANALYTICS_SUPPRESS_WARNING
+  #endif
+
+  #if __has_include(<FirebaseAppCheck/FirebaseAppCheck.h>)
+    #import <FirebaseAppCheck/FirebaseAppCheck.h>
+  #endif
+
+  #if __has_include(<FirebaseAppDistribution/FirebaseAppDistribution.h>)
+    #import <FirebaseAppDistribution/FirebaseAppDistribution.h>
   #endif
 
   #if __has_include(<FirebaseAuth/FirebaseAuth.h>)
     #import <FirebaseAuth/FirebaseAuth.h>
   #endif
 
-  #if __has_include(<FirebaseCrash/FirebaseCrash.h>)
-    #import <FirebaseCrash/FirebaseCrash.h>
+  #if __has_include(<FirebaseCrashlytics/FirebaseCrashlytics.h>)
+    #import <FirebaseCrashlytics/FirebaseCrashlytics.h>
   #endif
 
   #if __has_include(<FirebaseDatabase/FirebaseDatabase.h>)
@@ -42,40 +58,12 @@ Firebase services work as intended."
     #import <FirebaseInAppMessaging/FirebaseInAppMessaging.h>
   #endif
 
-  #if __has_include(<FirebaseInstanceID/FirebaseInstanceID.h>)
-    #import <FirebaseInstanceID/FirebaseInstanceID.h>
-  #endif
-
-  #if __has_include(<FirebaseInvites/FirebaseInvites.h>)
-    #import <FirebaseInvites/FirebaseInvites.h>
+  #if __has_include(<FirebaseInstallations/FirebaseInstallations.h>)
+    #import <FirebaseInstallations/FirebaseInstallations.h>
   #endif
 
   #if __has_include(<FirebaseMessaging/FirebaseMessaging.h>)
     #import <FirebaseMessaging/FirebaseMessaging.h>
-  #endif
-
-  #if __has_include(<FirebaseMLModelInterpreter/FirebaseMLModelInterpreter.h>)
-    #import <FirebaseMLModelInterpreter/FirebaseMLModelInterpreter.h>
-  #endif
-
-  #if __has_include(<FirebaseMLVision/FirebaseMLVision.h>)
-    #import <FirebaseMLVision/FirebaseMLVision.h>
-  #endif
-
-  #if __has_include(<FirebaseMLVisionBarcodeModel/FirebaseMLVisionBarcodeModel.h>)
-    #import <FirebaseMLVisionBarcodeModel/FirebaseMLVisionBarcodeModel.h>
-  #endif
-
-  #if __has_include(<FirebaseMLVisionFaceModel/FirebaseMLVisionFaceModel.h>)
-    #import <FirebaseMLVisionFaceModel/FirebaseMLVisionFaceModel.h>
-  #endif
-
-  #if __has_include(<FirebaseMLVisionLabelModel/FirebaseMLVisionLabelModel.h>)
-    #import <FirebaseMLVisionLabelModel/FirebaseMLVisionLabelModel.h>
-  #endif
-
-  #if __has_include(<FirebaseMLVisionTextModel/FirebaseMLVisionTextModel.h>)
-    #import <FirebaseMLVisionTextModel/FirebaseMLVisionTextModel.h>
   #endif
 
   #if __has_include(<FirebasePerformance/FirebasePerformance.h>)
@@ -88,18 +76,6 @@ Firebase services work as intended."
 
   #if __has_include(<FirebaseStorage/FirebaseStorage.h>)
     #import <FirebaseStorage/FirebaseStorage.h>
-  #endif
-
-  #if __has_include(<GoogleMobileAds/GoogleMobileAds.h>)
-    #import <GoogleMobileAds/GoogleMobileAds.h>
-  #endif
-
-  #if __has_include(<Fabric/Fabric.h>)
-    #import <Fabric/Fabric.h>
-  #endif
-
-  #if __has_include(<Crashlytics/Crashlytics.h>)
-    #import <Crashlytics/Crashlytics.h>
   #endif
 
 #endif  // defined(__has_include)

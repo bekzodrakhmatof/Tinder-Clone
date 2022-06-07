@@ -53,7 +53,7 @@ class CardView: UIView {
         addGestureRecognizer(tapGesture)
     }
     
-    fileprivate let moreInfoButton: UIButton = {
+    lazy var moreInfoButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(#imageLiteral(resourceName: "info_icon").withRenderingMode(.alwaysOriginal), for: .normal)
         button.addTarget(self, action: #selector(handelMoreInfoButton), for: .touchUpInside)
